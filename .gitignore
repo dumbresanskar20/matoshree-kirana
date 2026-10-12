@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment & Secret Credentials
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+out/
+
+# Archives and binaries
+*.zip
+*.tar.gz
+*.tgz
+*.apk
+
+# Temporary files & Logs
+vite.config.js.timestamp*
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
