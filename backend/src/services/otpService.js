@@ -8,7 +8,12 @@ const generateOTP = () => {
 // Reusable MealBook Email Layout with Header and Footer branding & website
 const getMealBookEmailLayout = ({ title, bodyHtml }) => {
   const websiteUrl = 'https://mealbook.in';
-  const studentPortalUrl = (process.env.FRONTEND_STUDENT_URL || process.env.FRONTEND_URL || 'https://matoshree-kirana.mealbook.in').replace(/\/+$/, '');
+  const studentPortalUrl = (
+    process.env.FRONTEND_STUDENT_URL ||
+    process.env.FRONTEND_STUDENT_VERCEL_URL ||
+    process.env.FRONTEND_URL ||
+    'https://matoshree-kirana.mealbook.in'
+  ).replace(/\/+$/, '');
   const currentYear = new Date().getFullYear();
 
   return `

@@ -1,6 +1,10 @@
 import { io } from 'socket.io-client';
 
 export const getSocketUrl = () => {
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return (import.meta.env.VITE_RENDER_SOCKET_URL || 'https://matoshree-kirana.onrender.com').replace(/\/+$/, '');
+  }
+
   if (import.meta.env.VITE_SOCKET_URL) {
     return import.meta.env.VITE_SOCKET_URL.replace(/\/+$/, '');
   }

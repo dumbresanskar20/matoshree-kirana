@@ -1,8 +1,15 @@
 import axios from 'axios';
 
 const isDev = import.meta.env.DEV;
-const envApiUrl = import.meta.env.VITE_API_URL;
-const rawApiUrl = isDev ? '/api' : (envApiUrl || 'https://matoshree-api.mealbook.in/api');
+const getRawApiUrl = () => {
+  if (isDev) return '/api';
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return (import.meta.env.VITE_RENDER_API_URL || 'https://matoshree-kirana.onrender.com/api');
+  }
+  return envApiUrl || 'https://matoshree-api.mealbook.in/api';
+};
+
+const rawApiUrl = getRawApiUrl();
 const cleanApiUrl = rawApiUrl.replace(/\/+$/, '');
 const API_BASE_URL = cleanApiUrl.endsWith('/api') ? `${cleanApiUrl}/super-admin` : `${cleanApiUrl}/api/super-admin`;
 

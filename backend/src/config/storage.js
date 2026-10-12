@@ -78,7 +78,7 @@ const formatPublicImageUrl = (imageUrl, req) => {
 
   // If it's a relative uploads path, prepend the backend host
   if (imageUrl.startsWith('/uploads/')) {
-    let baseUrl = process.env.API_BASE_URL;
+    let baseUrl = process.env.API_BASE_URL || process.env.API_RENDER_URL;
     if (!baseUrl && req) {
       baseUrl = `${req.protocol}://${req.get('host')}`;
     }

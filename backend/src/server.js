@@ -77,10 +77,18 @@ const cleanOrigin = (url) => (url ? url.replace(/\/+$/, '') : '');
 
 const rawOrigins = [
   process.env.FRONTEND_STUDENT_URL,
+  process.env.FRONTEND_STUDENT_VERCEL_URL,
   process.env.FRONTEND_ADMIN_URL,
+  process.env.FRONTEND_ADMIN_VERCEL_URL,
+  process.env.FRONTEND_SUPERADMIN_URL,
+  process.env.FRONTEND_SUPERADMIN_VERCEL_URL,
   'https://matoshree-kirana.mealbook.in',
   'https://matoshree-admin.mealbook.in',
   'https://matoshree-superadmin.mealbook.in',
+  'https://matoshree-kirana.vercel.app',
+  'https://matoshree-kirana-5sf7.vercel.app',
+  'https://matoshree-kirana-rixf.vercel.app',
+  'https://matoshree-kirana.onrender.com',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
@@ -104,6 +112,7 @@ const isOriginAllowed = (origin) => {
   if (normalizedOrigin.endsWith('.mealbook.in')) return true;
   if (normalizedOrigin === 'https://mealbook.in' || normalizedOrigin === 'http://mealbook.in') return true;
   if (normalizedOrigin.endsWith('.vercel.app')) return true;
+  if (normalizedOrigin.endsWith('.onrender.com')) return true;
   // Allow localhost and private local network IPs (e.g. 10.x.x.x, 192.168.x.x, 172.16-31.x.x)
   if (/^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:[0-9]+)?$/i.test(normalizedOrigin)) {
     return true;

@@ -49,7 +49,10 @@ export default function RatingsReviewsScreen() {
   const resolveFoodImage = (url) => {
     if (!url) return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    const base = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'https://matoshree-api.mealbook.in';
+    let base = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'https://matoshree-api.mealbook.in';
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      base = 'https://matoshree-kirana.onrender.com';
+    }
     return `${base.replace(/\/+$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
