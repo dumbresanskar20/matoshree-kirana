@@ -720,9 +720,9 @@ const fulfillPaidOrder = async ({
             const itemQuantity = Number(cartItem.quantity) || 1;
             const { itemPrice, itemName, variantName } = resolveMenuItemVariant(dbItem, cartItem);
             await connection.execute(
-              `INSERT INTO OrderItem (order_id, menu_item_id, item_name, price, quantity, variant_name)
-               VALUES (?, ?, ?, ?, ?, ?)`,
-              [finalOrderId, dbItem.id, itemName, itemPrice, itemQuantity, variantName || null]
+              `INSERT INTO OrderItem (order_id, menu_item_id, product_id, item_name, price, quantity, variant_name)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [finalOrderId, dbItem.id, dbItem.id, itemName, itemPrice, itemQuantity, variantName || null]
             );
           }
         }
@@ -813,9 +813,9 @@ const fulfillPaidOrder = async ({
 
       for (const it of validatedItems) {
         await connection.execute(
-          `INSERT INTO OrderItem (order_id, menu_item_id, item_name, price, quantity, variant_name)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [finalOrderId, it.menu_item_id, it.item_name, it.price, it.quantity, it.variant_name || null]
+          `INSERT INTO OrderItem (order_id, menu_item_id, product_id, item_name, price, quantity, variant_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [finalOrderId, it.menu_item_id, it.menu_item_id, it.item_name, it.price, it.quantity, it.variant_name || null]
         );
       }
     }
@@ -2440,9 +2440,9 @@ const createManualOrder = async (req, res) => {
 
       for (const it of validatedItems) {
         await connection.execute(
-          `INSERT INTO OrderItem (order_id, menu_item_id, item_name, price, quantity, variant_name)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [finalOrderId, it.menu_item_id, it.item_name, it.price, it.quantity, it.variant_name || null]
+          `INSERT INTO OrderItem (order_id, menu_item_id, product_id, item_name, price, quantity, variant_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [finalOrderId, it.menu_item_id, it.menu_item_id, it.item_name, it.price, it.quantity, it.variant_name || null]
         );
       }
 

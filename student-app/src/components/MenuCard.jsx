@@ -153,7 +153,7 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
           )}
         </div>
 
-        {/* Price Tag Overlay (Bottom-Right) with Early Discount */}
+        {/* Price Tag Overlay (Bottom-Right) with Kirana MRP & Early Discount */}
         <div className="absolute bottom-3 right-3 bg-brand-dark/90 backdrop-blur-md text-white px-3 py-1.5 rounded-2xl font-display font-extrabold shadow-lg flex items-baseline gap-1.5">
           {discountInfo?.is_discount_active && Number(discountInfo?.discount_percentage) > 0 ? (
             <>
@@ -164,10 +164,22 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
                 ₹{minPrice}
               </span>
             </>
+          ) : Number(item.mrp) > Number(minPrice) ? (
+            <>
+              <span className="text-emerald-400 text-lg">
+                ₹{minPrice}
+              </span>
+              <span className="text-[11px] text-stone-400 line-through font-medium">
+                ₹{item.mrp}
+              </span>
+            </>
           ) : (
             <span className="text-lg">
               {hasItemVariants && minPrice !== maxPrice ? `From ₹${minPrice}` : `₹${minPrice}`}
             </span>
+          )}
+          {item.unit && (
+            <span className="text-[10px] text-stone-300 font-normal">/{item.unit}</span>
           )}
         </div>
       </div>
@@ -175,14 +187,17 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
       {/* Item Details Content */}
       <div className="p-5 flex-1 flex flex-col justify-between">
         <div>
+          {item.brand && (
+            <span className="inline-block text-[10px] font-black uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-200/60 px-2 py-0.5 rounded-md mb-1.5">
+              {item.brand}
+            </span>
+          )}
           <h3 className="text-lg font-bold font-display text-brand-dark group-hover:text-brand-orange transition-colors leading-snug">
             {item.name}
           </h3>
 
-
-
           <p className="text-xs text-stone-500 mt-1.5 line-clamp-2 leading-relaxed font-medium">
-            {item.description || 'Piping hot authentic preparation cooked fresh in the campus kitchen.'}
+            {item.description || 'Premium quality grocery product at Matoshree Kirana Store.'}
           </p>
         </div>
 

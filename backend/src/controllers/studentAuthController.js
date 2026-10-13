@@ -373,6 +373,19 @@ const loginStudent = async (req, res) => {
         email: student.email,
         phone: student.phone,
         roll_no: student.roll_no,
+        address: student.address || null,
+        city: student.city || null,
+        pincode: student.pincode || null,
+      },
+      customer: {
+        id: student.id,
+        _id: student.id,
+        name: student.name,
+        email: student.email,
+        phone: student.phone,
+        address: student.address || null,
+        city: student.city || null,
+        pincode: student.pincode || null,
       },
     });
   } catch (error) {
@@ -670,6 +683,20 @@ const googleAuthStudent = async (req, res) => {
         phone: student.phone || null,
         roll_no: student.roll_no || null,
         avatar_url: student.avatar_url || avatarUrl || null,
+        address: student.address || null,
+        city: student.city || null,
+        pincode: student.pincode || null,
+      },
+      customer: {
+        id: student.id,
+        _id: student.id,
+        name: student.name,
+        email: student.email,
+        phone: student.phone || null,
+        avatar_url: student.avatar_url || avatarUrl || null,
+        address: student.address || null,
+        city: student.city || null,
+        pincode: student.pincode || null,
       },
     });
   } catch (error) {

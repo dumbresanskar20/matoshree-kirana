@@ -32,14 +32,27 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
   }, [selectedMealType]);
 
   const MEAL_CONFIG = {
-    breakfast: { label: 'Breakfast', icon: '🌅' },
-    lunch: { label: 'Lunch', icon: '☀️' },
-    snacks: { label: 'Snacks', icon: '☕' },
-    dinner: { label: 'Dinner', icon: '🌙' },
+    groceries: { label: 'Groceries & Staples', icon: '🌾' },
+    flours_grains: { label: 'Atta & Flours', icon: '🍞' },
+    dals_pulses: { label: 'Dals & Pulses', icon: '🥣' },
+    oils_ghee: { label: 'Edible Oils & Ghee', icon: '🛢️' },
+    spices_masalas: { label: 'Spices & Masalas', icon: '🌶️' },
+    dairy_eggs: { label: 'Dairy & Eggs', icon: '🥛' },
+    snacks_beverages: { label: 'Snacks & Beverages', icon: '☕' },
+    personal_care: { label: 'Personal Care', icon: '🧼' },
+    household: { label: 'Cleaning & Household', icon: '🧹' },
+    daily_essentials: { label: 'Daily Essentials', icon: '🛒' },
+    breakfast: { label: 'Breakfast Essentials', icon: '🍳' },
+    lunch: { label: 'Lunch Essentials', icon: '🍛' },
+    snacks: { label: 'Evening Snacks', icon: '🍪' },
+    dinner: { label: 'Dinner Essentials', icon: '🍲' },
   };
 
-  const getMealMeta = (rawType) => {
+  const getMealMeta = (rawType, windowItem = null) => {
     const type = (rawType || '').toLowerCase().trim();
+    if (windowItem && windowItem.category_name) {
+      return { label: windowItem.category_name, icon: windowItem.icon || MEAL_CONFIG[type]?.icon || '🛒' };
+    }
     if (MEAL_CONFIG[type]) {
       return MEAL_CONFIG[type];
     }
@@ -50,20 +63,16 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
       .replace(/\b\w/g, (c) => c.toUpperCase());
 
     // Context-sensitive icon mapping
-    let icon = '🍱';
+    let icon = '🛒';
     if (type.includes('shake') || type.includes('smoothie')) icon = '🥤';
     else if (type.includes('coffee') || type.includes('cafe')) icon = '🧋';
     else if (type.includes('tea') || type.includes('chai')) icon = '🍵';
-    else if (type.includes('momo') || type.includes('dimsum')) icon = '🥟';
-    else if (type.includes('pasta') || type.includes('noodle') || type.includes('maggi') || type.includes('spaghetti')) icon = '🍝';
-    else if (type.includes('pizza')) icon = '🍕';
-    else if (type.includes('burger')) icon = '🍔';
-    else if (type.includes('sandwich') || type.includes('toast')) icon = '🥪';
-    else if (type.includes('rice') || type.includes('biryani') || type.includes('thali')) icon = '🍛';
-    else if (type.includes('sweet') || type.includes('dessert') || type.includes('ice_cream') || type.includes('cake')) icon = '🍨';
-    else if (type.includes('roll') || type.includes('wrap')) icon = '🌯';
-    else if (type.includes('juice') || type.includes('drink') || type.includes('beverage')) icon = '🍹';
-    else if (type.includes('snack') || type.includes('fast_food') || type.includes('fry') || type.includes('fries')) icon = '🍟';
+    else if (type.includes('oil') || type.includes('ghee')) icon = '🛢️';
+    else if (type.includes('atta') || type.includes('flour') || type.includes('grain')) icon = '🍞';
+    else if (type.includes('dal') || type.includes('pulse')) icon = '🥣';
+    else if (type.includes('spice') || type.includes('masala')) icon = '🌶️';
+    else if (type.includes('soap') || type.includes('wash') || type.includes('shampoo')) icon = '🧼';
+    else if (type.includes('biscuit') || type.includes('cookie') || type.includes('snack')) icon = '🍪';
 
     return { label: formattedLabel, icon };
   };
@@ -72,11 +81,11 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
   const availableMealTypes = (activeMealWindows && activeMealWindows.length > 0)
     ? activeMealWindows.map((w) => {
         const type = (w.meal_type || '').toLowerCase();
-        const meta = getMealMeta(type);
+        const meta = getMealMeta(type, w);
         return {
           id: type,
-          label: meta.label,
-          icon: meta.icon,
+          label: w.category_name || meta.label,
+          icon: w.icon || meta.icon,
           isCurrentlyOpen: Boolean(w.is_currently_open),
           startTime: w.formatted_start_time,
           endTime: w.formatted_end_time,

@@ -9,6 +9,15 @@ let reviewSchemaEnsured = false;
 const ensureReviewSchema = async () => {
   if (reviewSchemaEnsured) return;
   try {
+    const [prRows] = await pool.query(
+      `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ProductReview' LIMIT 1`
+    );
+    if (prRows && prRows.length > 0) {
+      reviewSchemaEnsured = true;
+      return;
+    }
+
     // 1. Create MenuItemReview table if it doesn't exist
     await pool.query(`
       CREATE TABLE IF NOT EXISTS \`MenuItemReview\` (

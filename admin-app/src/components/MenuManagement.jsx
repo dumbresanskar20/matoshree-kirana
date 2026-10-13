@@ -73,7 +73,7 @@ export default function MenuManagement() {
       if (res.data && res.data.windows) {
         const types = res.data.windows
           .map((w) => (w.meal_type || '').toLowerCase())
-          .filter((t) => Boolean(t) && !['breakfast', 'lunch', 'snacks', 'dinner'].includes(t));
+          .filter(Boolean);
         setMealTypes(types);
         if (!mealType && types.length > 0) {
           setMealType(types[0]);

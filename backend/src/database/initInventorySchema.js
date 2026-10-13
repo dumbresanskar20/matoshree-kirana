@@ -71,23 +71,31 @@ const initInventorySchema = async () => {
       `, [maxNum]);
     }
 
-    // 7. Ensure MenuItem has available_quantity, daily_stock_limit, and is_available
-    const [menuItemCols] = await pool.query(`SHOW COLUMNS FROM \`MenuItem\` LIKE 'available_quantity'`);
-    if (menuItemCols.length === 0) {
-      await pool.query(`ALTER TABLE \`MenuItem\` ADD COLUMN \`available_quantity\` INT NOT NULL DEFAULT 100`);
-      console.log('✅ [Database] Added available_quantity column to MenuItem.');
-    }
+    // 7. Ensure Product / MenuItem has available_quantity, daily_stock_limit, and is_available
+    try {
+      const [tableInfo] = await pool.query(
+        `SELECT TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES 
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('Product', 'MenuItem')`
+      );
+      const isProductBase = tableInfo.some((t) => t.TABLE_NAME === 'Product' && t.TABLE_TYPE === 'BASE TABLE');
+      const targetStockTable = isProductBase ? 'Product' : 'MenuItem';
 
-    const [dailyStockCols] = await pool.query(`SHOW COLUMNS FROM \`MenuItem\` LIKE 'daily_stock_limit'`);
-    if (dailyStockCols.length === 0) {
-      await pool.query(`ALTER TABLE \`MenuItem\` ADD COLUMN \`daily_stock_limit\` INT NOT NULL DEFAULT 100`);
-      console.log('✅ [Database] Added daily_stock_limit column to MenuItem.');
-    }
+      const [menuItemCols] = await pool.query(`SHOW COLUMNS FROM \`${targetStockTable}\` LIKE 'available_quantity'`);
+      if (menuItemCols.length === 0) {
+        await pool.query(`ALTER TABLE \`${targetStockTable}\` ADD COLUMN \`available_quantity\` INT NOT NULL DEFAULT 100`);
+      }
 
-    const [availCols] = await pool.query(`SHOW COLUMNS FROM \`MenuItem\` LIKE 'is_available'`);
-    if (availCols.length === 0) {
-      await pool.query(`ALTER TABLE \`MenuItem\` ADD COLUMN \`is_available\` TINYINT(1) NOT NULL DEFAULT 1`);
-      console.log('✅ [Database] Added is_available column to MenuItem.');
+      const [dailyStockCols] = await pool.query(`SHOW COLUMNS FROM \`${targetStockTable}\` LIKE 'daily_stock_limit'`);
+      if (dailyStockCols.length === 0) {
+        await pool.query(`ALTER TABLE \`${targetStockTable}\` ADD COLUMN \`daily_stock_limit\` INT NOT NULL DEFAULT 100`);
+      }
+
+      const [availCols] = await pool.query(`SHOW COLUMNS FROM \`${targetStockTable}\` LIKE 'is_available'`);
+      if (availCols.length === 0) {
+        await pool.query(`ALTER TABLE \`${targetStockTable}\` ADD COLUMN \`is_available\` TINYINT(1) NOT NULL DEFAULT 1`);
+      }
+    } catch (_stockColErr) {
+      // Column alteration warning handled
     }
 
     // 8. Create InventoryConfig table for global settings (e.g. menu_stock_tracking_enabled)

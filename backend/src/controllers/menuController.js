@@ -54,6 +54,9 @@ const computeMealStatus = (w, currentTime = getCurrentTimeHHMM()) => {
     _id: w.id || w._id,
     id: w.id || w._id,
     meal_type: w.meal_type,
+    category_name: w.category_name || w.name || w.meal_type,
+    icon: w.icon || '🛒',
+    display_order: w.display_order || 0,
     start_time: w.start_time || '08:00',
     end_time: w.end_time || '20:00',
     serving_start_time: servingStartTime,
@@ -271,8 +274,8 @@ const getMenuItems = async (req, res) => {
         });
       }
 
-      let itemsSql = 'SELECT * FROM MenuItem WHERE meal_type = ?';
-      const itemsParams = [targetType];
+      let itemsSql = 'SELECT * FROM MenuItem WHERE (meal_type = ? OR category = ?)';
+      const itemsParams = [targetType, targetType];
       if (isStudentFetch) {
         itemsSql += ' AND is_active = 1';
       }
@@ -631,12 +634,16 @@ const createMenuItem = async (req, res) => {
       menuItemId = menuResult.insertId;
 
       if (recipeData.length > 0) {
-        for (const r of recipeData) {
-          await connection.execute(
-            `INSERT INTO RecipeItem (menu_item_id, inventory_item_id, quantity_required, quantity_unit)
-             VALUES (?, ?, ?, ?)`,
-            [menuItemId, Number(r.inventory_item_id), Number(r.quantity_required), r.quantity_unit]
-          );
+        try {
+          for (const r of recipeData) {
+            await connection.execute(
+              `INSERT INTO RecipeItem (menu_item_id, inventory_item_id, quantity_required, quantity_unit)
+               VALUES (?, ?, ?, ?)`,
+              [menuItemId, Number(r.inventory_item_id), Number(r.quantity_required), r.quantity_unit]
+            );
+          }
+        } catch (_riErr) {
+          // RecipeItem table omitted for Kirana store
         }
       }
 
@@ -774,16 +781,20 @@ const updateMenuItem = async (req, res) => {
       }
 
       if (hasRecipe) {
-        await connection.execute('DELETE FROM RecipeItem WHERE menu_item_id = ?', [targetId]);
+        try {
+          await connection.execute('DELETE FROM RecipeItem WHERE menu_item_id = ?', [targetId]);
 
-        if (recipeData.length > 0) {
-          for (const r of recipeData) {
-            await connection.execute(
-              `INSERT INTO RecipeItem (menu_item_id, inventory_item_id, quantity_required, quantity_unit)
-               VALUES (?, ?, ?, ?)`,
-              [targetId, Number(r.inventory_item_id), Number(r.quantity_required), r.quantity_unit]
-            );
+          if (recipeData.length > 0) {
+            for (const r of recipeData) {
+              await connection.execute(
+                `INSERT INTO RecipeItem (menu_item_id, inventory_item_id, quantity_required, quantity_unit)
+                 VALUES (?, ?, ?, ?)`,
+                [targetId, Number(r.inventory_item_id), Number(r.quantity_required), r.quantity_unit]
+              );
+            }
           }
+        } catch (_riErr) {
+          // RecipeItem table omitted for Kirana store
         }
       }
 
@@ -916,6 +927,15 @@ const deleteMenuItem = async (req, res) => {
 // Ensure MealWindow table exists and is populated with default meal types
 const ensureMealWindowTable = async () => {
   try {
+    // In Kirana store schema, Category is the primary table and MealWindow is a compatibility VIEW
+    const [catTables] = await pool.query(
+      `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Category' LIMIT 1`
+    );
+    if (catTables && catTables.length > 0) {
+      return;
+    }
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS \`MealWindow\` (
         \`id\` INT AUTO_INCREMENT PRIMARY KEY,

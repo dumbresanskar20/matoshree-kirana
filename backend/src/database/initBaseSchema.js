@@ -104,7 +104,21 @@ const addColumnIfNotExists = async (table, column, definition) => {
 
 const ensureKiranaProductSchema = async () => {
   try {
-    // 1. Check if MenuItem exists
+    // 1. If Product is already a base table (new unified Kirana schema), ensure views point to primary tables
+    const [productTables] = await pool.query(
+      `SELECT TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Product' LIMIT 1`
+    );
+    if (productTables.length > 0 && productTables[0].TABLE_TYPE === 'BASE TABLE') {
+      await pool.query('CREATE OR REPLACE VIEW `Student` AS SELECT * FROM `Customer`').catch(() => {});
+      await pool.query('CREATE OR REPLACE VIEW `MenuItem` AS SELECT * FROM `Product`').catch(() => {});
+      await pool.query('CREATE OR REPLACE VIEW `MealWindow` AS SELECT `id`, `code` AS `meal_type`, `name` AS `category_name`, `icon`, `display_order`, `start_time`, `end_time`, `custom_note`, `is_active`, `is_full_day`, `updated_at` FROM `Category`').catch(() => {});
+      await pool.query('CREATE OR REPLACE VIEW `MenuItemReview` AS SELECT * FROM `ProductReview`').catch(() => {});
+      await pool.query('CREATE OR REPLACE VIEW `CustomerOrder` AS SELECT * FROM `Order`').catch(() => {});
+      console.log('✅ [Kirana Schema] Base tables verified; compatibility views refreshed.');
+      return;
+    }
+
+    // Otherwise check legacy MenuItem table
     const [menuTables] = await pool.query(
       `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'MenuItem' LIMIT 1`
     );
