@@ -4,9 +4,9 @@ const envApiUrl = import.meta.env.VITE_API_URL;
 
 const getRawApiUrl = () => {
   if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-    return (import.meta.env.VITE_RENDER_API_URL || 'https://matoshree-kirana.onrender.com/api');
+    return (import.meta.env.VITE_RENDER_API_URL || 'https://matoshree-api.mealbook.in/api');
   }
-  return envApiUrl || 'https://matoshree-kirana.onrender.com/api';
+  return envApiUrl || 'https://matoshree-api.mealbook.in/api';
 };
 
 const rawApiUrl = getRawApiUrl();

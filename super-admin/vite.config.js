@@ -16,7 +16,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'https://matoshree-kirana.onrender.com',
+        target: 'https://matoshree-api.mealbook.in',
         changeOrigin: true,
         secure: false,
       },

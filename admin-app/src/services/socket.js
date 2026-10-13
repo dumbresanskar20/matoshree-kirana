@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 
 export const getSocketUrl = () => {
   if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-    return (import.meta.env.VITE_RENDER_SOCKET_URL || 'https://matoshree-kirana.onrender.com').replace(/\/+$/, '');
+    return (import.meta.env.VITE_RENDER_SOCKET_URL || 'https://matoshree-api.mealbook.in').replace(/\/+$/, '');
   }
 
   if (import.meta.env.VITE_SOCKET_URL) {
@@ -14,7 +14,7 @@ export const getSocketUrl = () => {
     return cleanApi.replace(/\/api\/?$/i, '');
   }
 
-  return 'https://matoshree-kirana.onrender.com';
+  return 'https://matoshree-api.mealbook.in';
 };
 
 export const createAdminSocketClient = (token) => {

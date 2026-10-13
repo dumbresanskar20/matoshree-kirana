@@ -89,6 +89,7 @@ const rawOrigins = [
   'https://matoshree-kirana-5sf7.vercel.app',
   'https://matoshree-kirana-rixf.vercel.app',
   'https://matoshree-kirana.onrender.com',
+  'https://matoshree-api.mealbook.in',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
