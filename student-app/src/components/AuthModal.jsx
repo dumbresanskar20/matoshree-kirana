@@ -372,15 +372,15 @@ export default function AuthModal() {
           <div className="flex items-center justify-center gap-2.5 mb-2">
             <img
               src={CAFE_D_CRUZE_LOGO}
-              alt="Le Safran Foods Logo"
+              alt="Matoshree Kirana Logo"
               className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl object-contain bg-white p-1 shadow-warm border border-amber-200"
             />
             <div className="text-left">
               <span className="font-display font-extrabold text-base sm:text-lg text-brand-dark tracking-tight leading-none block">
-                Le Safran <span className="text-brand-orange">Foods</span>
+                Matoshree <span className="text-brand-orange">Kirana</span>
               </span>
               <span className="text-[10px] sm:text-[11px] font-semibold text-stone-500 uppercase tracking-wider block mt-0.5">
-                Pre Booking Portal
+                Online Kirana Store
               </span>
             </div>
           </div>
@@ -397,7 +397,7 @@ export default function AuthModal() {
           <p className="text-xs text-stone-500 mt-1 font-medium px-2">
             {pendingCheckout ? (
               <span className="text-brand-orange font-bold flex items-center justify-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Please sign in to finalize your meal order
+                <Sparkles className="w-3.5 h-3.5" /> Please sign in to finalize your order
               </span>
             ) : mode === 'forgot-password' ? (
               'Enter your registered email to receive a password reset link'
@@ -406,7 +406,7 @@ export default function AuthModal() {
             ) : mode === 'change-password' ? (
               'Enter your old password and choose a new one below'
             ) : (
-              'Sign in to order hot meals with digital tokens at Le Safran Foods'
+              'Sign in to order fresh groceries & daily essentials at Matoshree Kirana'
             )}
           </p>
         </div>
@@ -504,7 +504,7 @@ export default function AuthModal() {
               disabled={loading}
               className="w-full mt-2 py-3 bg-gradient-to-r from-brand-orange to-amber-600 hover:from-amber-600 hover:to-brand-orange text-white font-bold rounded-2xl text-sm shadow-warm transition-all flex items-center justify-center gap-2"
             >
-              {loading ? 'Signing In...' : 'Sign In to Le Safran Foods'}
+              {loading ? 'Signing In...' : 'Sign In to Matoshree Kirana'}
               <ArrowRight className="w-4 h-4" />
             </button>
 

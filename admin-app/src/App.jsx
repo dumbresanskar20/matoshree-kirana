@@ -95,13 +95,13 @@ export default function App() {
           <div className="flex items-center gap-3">
             <img
               src={CAFE_D_CRUZE_LOGO}
-              alt="Le Safran Foods Logo"
+              alt="Matoshree Kirana Logo"
               className="w-10 h-10 rounded-2xl object-contain bg-white p-1 shadow-sm border border-slate-700"
             />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-extrabold text-base sm:text-lg text-white tracking-tight leading-none">
-                  Le Safran Foods <span className="text-emerald-400">Staff</span>
+                  Matoshree Kirana <span className="text-emerald-400">Staff</span>
                 </h1>
                 <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
                   Staff Mode
@@ -183,14 +183,14 @@ export default function App() {
         <header className="hidden md:flex bg-white border-b border-slate-200 px-6 py-3 items-center justify-between shadow-xs shrink-0 z-10">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-black text-slate-900 capitalize tracking-tight">
-              {activeTab === 'kitchen' ? 'Order Fulfillment & Kitchen Operations' :
+              {activeTab === 'kitchen' ? 'Order Fulfillment & Store Operations' :
                activeTab === 'history' ? 'Order History & Sales Analytics' :
-               activeTab === 'reviews' ? 'Ratings & User Feedback' :
-               activeTab === 'menu' ? 'Menu & Recipe Management' :
+               activeTab === 'reviews' ? 'Ratings & Customer Feedback' :
+               activeTab === 'menu' ? 'Product Catalog Management' :
                activeTab === 'inventory' ? 'Inventory & Stock Control' :
-               activeTab === 'menu-report' ? 'Menu Sales & Performance Reports' :
-               activeTab === 'timings' ? 'Meal Timing Schedules' :
-               activeTab === 'discounts' ? 'Discount Rules & Dynamic Pricing' :
+               activeTab === 'menu-report' ? 'Product Sales & Stock Reports' :
+               activeTab === 'timings' ? 'Store & Delivery Slot Schedules' :
+               activeTab === 'discounts' ? 'Discount Rules & Store Deals' :
                activeTab === 'staff' ? 'Staff Account Management' : 'Admin Dashboard'}
             </h2>
           </div>

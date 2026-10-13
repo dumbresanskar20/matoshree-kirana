@@ -46,10 +46,10 @@ export default function StudentsExplorer() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight flex items-center gap-2.5">
             <Users className="w-6 h-6 text-sky-400" />
-            <span>Registered Campus Users</span>
+            <span>Registered Store Users</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium">
-            Database records of all registered Le Safran Foods customers & users, verification status, and meal booking activity
+            Database records of all registered Matoshree Kirana customers & users, verification status, and shopping activity
           </p>
         </div>
 

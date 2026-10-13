@@ -42,11 +42,11 @@ export default function NotificationPermissionModal() {
           </div>
           <div className="flex items-center gap-2.5">
             <Bell className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>See desktop popups with token # and dining details</span>
+            <span>See desktop popups with token # and delivery details</span>
           </div>
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
-            <span>Never miss incoming food delivery orders</span>
+            <span>Never miss incoming grocery delivery orders</span>
           </div>
         </div>
 

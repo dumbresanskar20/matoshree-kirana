@@ -41,10 +41,10 @@ export default function InventoryExplorer() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight flex items-center gap-2.5">
             <Boxes className="w-6 h-6 text-purple-400" />
-            <span>Le Safran Foods Kitchen Inventory & Ingredients</span>
+            <span>Matoshree Kirana Store Inventory & Stocks</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium">
-            Database records of kitchen stocks, units, automated deductions, and re-order thresholds
+            Database records of store stocks, units, automated deductions, and re-order thresholds
           </p>
         </div>
 

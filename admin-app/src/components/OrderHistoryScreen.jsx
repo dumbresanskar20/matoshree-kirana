@@ -548,19 +548,26 @@ export default function OrderHistoryScreen() {
             />
           </div>
 
-          {/* Meal Type */}
+          {/* Category Filter */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Meal Category</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
             <select
               value={mealType}
               onChange={(e) => { setMealType(e.target.value); setPage(1); }}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-600 outline-none capitalize"
             >
               <option value="">All Categories</option>
-              <option value="breakfast">Breakfast</option>
-              <option value="lunch">Lunch</option>
-              <option value="snacks">Snacks</option>
-              <option value="dinner">Dinner</option>
+              {Array.from(
+                new Set(
+                  orders
+                    .map((o) => (o.meal_type || '').toLowerCase().trim())
+                    .filter((c) => Boolean(c) && !['breakfast', 'lunch', 'snacks', 'dinner'].includes(c))
+                )
+              ).map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -661,9 +668,9 @@ export default function OrderHistoryScreen() {
                   <th className="py-3.5 px-4">Date & Time</th>
                   <th className="py-3.5 px-4">Token #</th>
                   <th className="py-3.5 px-4">Delivery Address</th>
-                  <th className="py-3.5 px-4">User Info</th>
-                  <th className="py-3.5 px-4">Meal Type</th>
-                  <th className="py-3.5 px-4">Items Ordered</th>
+                  <th className="py-3.5 px-4">Customer</th>
+                  <th className="py-3.5 px-4">Category</th>
+                  <th className="py-3.5 px-4">Products Ordered</th>
                   <th className="py-3.5 px-4">Order Status</th>
                   <th className="py-3.5 px-4">Payment Status</th>
                   {isSuperAdmin && <th className="py-3.5 px-4 text-right">Total Amount</th>}
@@ -671,7 +678,7 @@ export default function OrderHistoryScreen() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-800">
                 {orders.map((ord) => {
-                  const studentName = ord.student?.name || ord.student_id?.name || ord.student_name || 'User';
+                  const studentName = ord.student?.name || ord.student_id?.name || ord.student_name || 'Customer';
                   const rollNo = ord.student?.roll_no || ord.student_id?.roll_no || ord.student_roll_no || '';
                   const pmInfo = formatPaymentMethod(ord.payment_method);
                   const PmIcon = pmInfo.icon;
@@ -758,10 +765,24 @@ export default function OrderHistoryScreen() {
                         </span>
                       </td>
 
-                      {/* Payment Method & Status */}
+                      {/* Payment Method & Actual Paid / Unpaid Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${pmInfo.color}`}>
+                        <div className="flex flex-col items-start gap-1">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                              (ord.payment_status || '').toLowerCase() === 'paid'
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : 'bg-rose-100 text-rose-800 border-rose-300'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                (ord.payment_status || '').toLowerCase() === 'paid' ? 'bg-emerald-600' : 'bg-rose-600'
+                              }`}
+                            />
+                            <span>{(ord.payment_status || '').toLowerCase() === 'paid' ? 'Paid' : 'Unpaid'}</span>
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500`}>
                             <PmIcon className="w-3 h-3 shrink-0" />
                             <span>{pmInfo.label}</span>
                           </span>

@@ -5,7 +5,7 @@ const { pool } = require('../database/db');
 /**
  * Helper to record actions in SuperAdminAuditLog table
  */
-const recordAuditLog = async (req, { action, clientId = null, clientName = 'Le Safran Foods', beforeValue = null, afterValue = null }) => {
+const recordAuditLog = async (req, { action, clientId = null, clientName = 'Matoshree Kirana', beforeValue = null, afterValue = null }) => {
   try {
     const actorId = req.superAdmin ? req.superAdmin.id : null;
     const actorName = req.superAdmin ? req.superAdmin.name : 'Super Admin';
@@ -760,7 +760,7 @@ const deleteCanteenSubscription = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'All subscription plans for Le Safran Foods deleted and subscription reset to expired.',
+      message: 'All subscription plans for Matoshree Kirana deleted and subscription reset to expired.',
     });
   } catch (error) {
     console.error('[Delete Subscription Error]', error);

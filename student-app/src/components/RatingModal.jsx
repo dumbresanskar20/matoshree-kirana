@@ -138,7 +138,7 @@ export default function RatingModal({ order, isOpen, onClose, onRatingSubmitted 
             </div>
             <div className="min-w-0">
               <h3 className="font-display font-extrabold text-base sm:text-lg text-brand-dark truncate">
-                Rate Your Meal
+                Rate Your Order
               </h3>
               <p className="text-[11px] text-stone-500 font-semibold truncate">
                 Token #{order.token_number} • {order.meal_type?.toUpperCase()}
@@ -163,7 +163,7 @@ export default function RatingModal({ order, isOpen, onClose, onRatingSubmitted 
             </div>
             <h4 className="text-lg font-extrabold text-stone-900">Thank You For Your Feedback!</h4>
             <p className="text-xs text-stone-500 max-w-xs mx-auto font-medium">
-              Your review helps the campus canteen serve you better delicious meals every day.
+              Your review helps Matoshree Kirana serve you better quality groceries and daily essentials every day.
             </p>
           </div>
         ) : (
@@ -176,7 +176,7 @@ export default function RatingModal({ order, isOpen, onClose, onRatingSubmitted 
 
             {loading ? (
               <div className="py-8 text-center text-xs text-stone-400 font-semibold animate-pulse">
-                Loading meal details...
+                Loading order details...
               </div>
             ) : items.length === 0 ? (
               <div className="py-6 text-center text-xs text-stone-500 font-medium">
@@ -247,7 +247,7 @@ export default function RatingModal({ order, isOpen, onClose, onRatingSubmitted 
                         rows={2}
                         value={currentReview}
                         onChange={(e) => handleReviewChange(itemId, e.target.value)}
-                        placeholder={`What did you think of the ${it.item_name}? (Taste, portion, freshness...)`}
+                        placeholder={`What did you think of the ${it.item_name}? (Quality, packaging, freshness...)`}
                         className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:ring-2 focus:ring-amber-500 outline-none resize-none font-medium"
                       />
                     </div>

@@ -197,10 +197,10 @@ const initSuperAdminSchema = async () => {
       );
     }
 
-    // 8. Seed / Synchronize Default Client (`Le Safran Foods`)
+    // 8. Seed / Synchronize Default Client (`Matoshree Kirana`)
     const [clientRows] = await pool.query('SELECT COUNT(*) as count FROM `Client`');
     if (clientRows[0].count === 0) {
-      console.log('[SuperAdmin Schema] Seeding primary client Le Safran Foods...');
+      console.log('[SuperAdmin Schema] Seeding primary client Matoshree Kirana...');
       const [firstPlan] = await pool.query('SELECT id, price FROM `Plan` WHERE code = ? LIMIT 1', ['monthly']);
       const planId = firstPlan[0]?.id || null;
       const planPrice = firstPlan[0]?.price || 1000.0;
@@ -214,24 +214,24 @@ const initSuperAdminSchema = async () => {
           (name, slug, contact_email, contact_phone, address, plan_id, status, trial_ends_at, subscription_price, subscription_started_at, subscription_ends_at, is_admin_enabled, is_student_enabled, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`,
         [
-          'Le Safran Foods',
-          'le-safran-foods',
-          'contact@cafedcruze.com',
+          'Matoshree Kirana',
+          'matoshree-kirana',
+          'contact@matoshree-kirana.mealbook.in',
           '+91 9876543210',
-          'Le Safran Foods, Campus Food Court',
+          'Matoshree Kirana Store, Main Road',
           planId,
           'active',
           trialEnds,
           planPrice,
           now,
           nextYear,
-          'Primary restaurant client.',
+          'Primary kirana store client.',
         ]
       );
     } else {
-      // Synchronize existing Client row name to Le Safran Foods
+      // Synchronize existing Client row name to Matoshree Kirana
       await pool.execute(
-        `UPDATE \`Client\` SET name = 'Le Safran Foods' WHERE name IN ('DYPCOEI Canteen', 'Cafe D Cruze Restaurant')`
+        `UPDATE \`Client\` SET name = 'Matoshree Kirana', slug = 'matoshree-kirana', address = 'Matoshree Kirana Store, Main Road', contact_email = 'contact@matoshree-kirana.mealbook.in' WHERE name IN ('DYPCOEI Canteen', 'Cafe D Cruze Restaurant', 'Le Safran Foods')`
       );
     }
 

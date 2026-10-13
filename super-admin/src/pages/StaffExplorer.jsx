@@ -32,10 +32,10 @@ export default function StaffExplorer() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight flex items-center gap-2.5">
             <UserCog className="w-6 h-6 text-rose-400" />
-            <span>Le Safran Foods Staff & Admin Accounts</span>
+            <span>Matoshree Kirana Staff & Admin Accounts</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium">
-            Database records of authorized canteen managers, kitchen staff, and terminal operators
+            Database records of authorized store managers, staff, and terminal operators
           </p>
         </div>
 

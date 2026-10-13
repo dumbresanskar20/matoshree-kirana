@@ -33,7 +33,7 @@ export default function Dashboard({ setActiveTab }) {
     return (
       <div className="p-6 sm:p-10 flex flex-col items-center justify-center min-h-[60vh] space-y-3">
         <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-        <p className="text-xs font-semibold text-slate-400">Connecting to Le Safran Foods database...</p>
+        <p className="text-xs font-semibold text-slate-400">Connecting to Matoshree Kirana database...</p>
       </div>
     );
   }
@@ -45,13 +45,13 @@ export default function Dashboard({ setActiveTab }) {
 
   const kpis = [
     {
-      label: 'Total Canteen Revenue',
+      label: 'Total Store Revenue',
       value: `₹${Number(stats.totalRevenue || 0).toLocaleString('en-IN')}`,
       icon: IndianRupee,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/20',
       linkTab: 'orders',
-      sublabel: 'All-time meal booking sales',
+      sublabel: 'All-time grocery order sales',
     },
     {
       label: 'Total Orders Processed',
@@ -60,7 +60,7 @@ export default function Dashboard({ setActiveTab }) {
       color: 'text-indigo-400',
       bg: 'bg-indigo-500/10 border-indigo-500/20',
       linkTab: 'orders',
-      sublabel: 'Tokens generated for kitchen',
+      sublabel: 'Tokens generated for billing/dispatch',
     },
     {
       label: 'Registered Users',
@@ -69,16 +69,16 @@ export default function Dashboard({ setActiveTab }) {
       color: 'text-sky-400',
       bg: 'bg-sky-500/10 border-sky-500/20',
       linkTab: 'students',
-      sublabel: 'Verified campus accounts',
+      sublabel: 'Verified customer accounts',
     },
     {
-      label: 'Menu Dishes Active',
+      label: 'Catalog Items Active',
       value: `${stats.activeMenuItems || 0} / ${stats.totalMenuItems || 0}`,
       icon: Utensils,
       color: 'text-amber-400',
       bg: 'bg-amber-500/10 border-amber-500/20',
       linkTab: 'menu',
-      sublabel: 'Available meal windows',
+      sublabel: 'Available catalog items',
     },
     {
       label: 'Inventory Stock Items',
@@ -87,35 +87,35 @@ export default function Dashboard({ setActiveTab }) {
       color: 'text-purple-400',
       bg: 'bg-purple-500/10 border-purple-500/20',
       linkTab: 'inventory',
-      sublabel: stats.lowStockCount > 0 ? `⚠️ ${stats.lowStockCount} Low stock alerts` : 'All ingredients in healthy stock',
+      sublabel: stats.lowStockCount > 0 ? `⚠️ ${stats.lowStockCount} Low stock alerts` : 'All items in healthy stock',
     },
     {
-      label: 'Staff & Kitchen Crew',
+      label: 'Staff & Store Crew',
       value: `${stats.totalStaff || 0} Accounts`,
       icon: UserCog,
       color: 'text-rose-400',
       bg: 'bg-rose-500/10 border-rose-500/20',
       linkTab: 'staff',
-      sublabel: 'Admin and kitchen operators',
+      sublabel: 'Admin and store staff operators',
     },
   ];
 
   return (
     <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto">
       
-      {/* Top Banner: Le Safran Foods Status Card */}
+      {/* Top Banner: Matoshree Kirana Status Card */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/70 p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 rounded-full text-xs font-bold flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Le Safran Foods</span>
+              <span>Matoshree Kirana</span>
             </span>
             <StatusBadge status={canteen.status} size="lg" />
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight">
-            Le Safran Foods Operations & Database
+            Matoshree Kirana Operations & Database
           </h1>
           
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 pt-1">
@@ -194,8 +194,8 @@ export default function Dashboard({ setActiveTab }) {
                 <ShoppingBag className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Recent Canteen Orders</h2>
-                <p className="text-[11px] text-slate-400">Live order flow from user meal portal</p>
+                <h2 className="text-sm font-bold text-white">Recent Store Orders</h2>
+                <p className="text-[11px] text-slate-400">Live order flow from online store portal</p>
               </div>
             </div>
 

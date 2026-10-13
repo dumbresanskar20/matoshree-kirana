@@ -389,7 +389,7 @@ export default function App() {
               We're closed right now — check back soon!
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 font-medium max-w-md mx-auto">
-              Canteen Management has temporarily paused all meal offerings today. Please check back during standard operating hours.
+              Matoshree Kirana store management has temporarily paused all orders today. Please check back during standard operating hours.
             </p>
           </div>
         ) : (
@@ -462,14 +462,14 @@ export default function App() {
               <div className="text-center py-12 sm:py-16 bg-amber-50/60 rounded-3xl border border-amber-200 space-y-2 px-4">
                 <AlertCircle className="w-8 h-8 text-amber-600 mx-auto" />
                 <p className="font-display font-bold text-stone-800 text-base sm:text-lg">
-                  {(selectedMealType?.replace(/_/g, ' ') || '').toUpperCase()} is currently not offered by Canteen Management.
+                  {(selectedMealType?.replace(/_/g, ' ') || '').toUpperCase()} is currently not offered by Matoshree Kirana.
                 </p>
-                <p className="text-xs text-stone-500">Please select another active meal category above.</p>
+                <p className="text-xs text-stone-500">Please select another active category above.</p>
               </div>
             ) : menuItems.length === 0 ? (
               <div className="text-center py-12 sm:py-16 bg-white/60 rounded-3xl border border-dashed border-amber-200 px-4">
-                <p className="font-display font-bold text-stone-700 text-base sm:text-lg">No active items for this meal time right now.</p>
-                <p className="text-xs text-stone-500 mt-1">Please select another meal category above.</p>
+                <p className="font-display font-bold text-stone-700 text-base sm:text-lg">No active items in this category right now.</p>
+                <p className="text-xs text-stone-500 mt-1">Please select another category above.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
@@ -488,11 +488,11 @@ export default function App() {
           <div className="flex items-center gap-2">
             <img
               src={CAFE_D_CRUZE_LOGO}
-              alt="Le Safran Foods Logo"
+              alt="Matoshree Kirana Logo"
               className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg object-contain bg-white p-0.5"
             />
             <span className="font-display font-bold text-sm sm:text-base text-white tracking-tight">
-              Le Safran <span className="text-brand-orange">Foods</span>
+              Matoshree <span className="text-brand-orange">Kirana</span>
             </span>
           </div>
 

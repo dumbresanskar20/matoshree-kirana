@@ -39,7 +39,7 @@ const getMealBookEmailLayout = ({ title, bodyHtml }) => {
                     </span>
                   </div>
                   <h1 style="margin: 4px 0 0 0; color: #ffffff; font-size: 18px; font-weight: 800; letter-spacing: -0.2px;">
-                    Smart Campus Mess & Canteen
+                    Matoshree Kirana • Your Daily Needs Our Priority
                   </h1>
                   <div style="margin-top: 10px;">
                     <a href="${websiteUrl}" target="_blank" style="color: #ffedd5; font-size: 12px; font-weight: 700; text-decoration: underline; letter-spacing: 0.3px;">
@@ -61,7 +61,7 @@ const getMealBookEmailLayout = ({ title, bodyHtml }) => {
                 <td style="background-color: #f8fafc; padding: 24px 28px; border-top: 1px solid #e2e8f0; text-align: center;">
                   <div style="margin-bottom: 10px;">
                     <span style="font-size: 15px; font-weight: 800; color: #0f172a;">🍱 MealBook</span>
-                    <span style="font-size: 13px; color: #64748b; font-weight: 500;"> — Smart Campus Dining Platform</span>
+                    <span style="font-size: 13px; color: #64748b; font-weight: 500;"> — Digital Kirana & Daily Essentials Platform</span>
                   </div>
 
                   <p style="margin: 0 0 12px 0; font-size: 13px; color: #475569; line-height: 1.5;">
@@ -119,7 +119,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
       const transporter = nodemailer.createTransport(transportConfig);
 
-      const senderEmail = EMAIL_FROM || `"Le Safran Foods" <${SMTP_USER}>`;
+      const senderEmail = EMAIL_FROM || `"Matoshree Kirana" <${SMTP_USER}>`;
 
       const info = await transporter.sendMail({
         from: senderEmail,
@@ -251,13 +251,13 @@ const sendAdminInvitation = async (email, username, inviteLink) => {
   const subject = 'Staff Account Invitation - MealBook';
   const bodyHtml = `
     <h2 style="margin: 0 0 12px 0; color: #0f172a; font-size: 20px; font-weight: 800;">
-      👨‍🍳 Welcome to MealBook Kitchen Operations
+      🛒 Welcome to Matoshree Kirana Store Operations
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569; font-size: 14px; line-height: 1.6;">
       Hello <strong>${username}</strong>,
     </p>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.6;">
-      An administrator has invited you to join the canteen operations team on <strong>MealBook</strong>.
+      An administrator has invited you to join the store operations team on <strong>MealBook</strong>.
     </p>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 14px; line-height: 1.6;">
       Please click the button below to set up your secure password and activate your staff account:

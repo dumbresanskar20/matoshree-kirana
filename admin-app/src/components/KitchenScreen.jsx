@@ -6,6 +6,8 @@ import {
   Clock,
   Check,
   UtensilsCrossed,
+  ShoppingBag,
+  Package,
   Search,
   Printer,
   Grid,
@@ -385,8 +387,8 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
         </head>
         <body>
           <div class="header">
-            <div class="title">LE SAFRAN FOODS</div>
-            <div class="subtitle">Order Token & Invoice</div>
+            <div class="title">MATOSHREE KIRANA</div>
+            <div class="subtitle">Your Daily Needs, Our Priority</div>
             <div class="token-box">${tokenNumber}</div>
           </div>
           <div class="details">
@@ -438,7 +440,7 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
           </div>
 
           <div class="footer">
-            Thank you for dining with us!<br/>
+            Thank you for shopping with us!<br/>
             Please present this token slip or QR at the counter.
           </div>
           <script>
@@ -531,27 +533,27 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
 
   const MEAL_TYPES = useMemo(() => {
     const base = [
-      { id: 'all', label: 'All Meals' },
-      { id: 'breakfast', label: 'Breakfast' },
-      { id: 'lunch', label: 'Lunch' },
-      { id: 'snacks', label: 'Snacks' },
-      { id: 'dinner', label: 'Dinner' },
+      { id: 'all', label: 'All Orders' },
     ];
-    const knownIds = new Set(base.map((b) => b.id));
+    const legacyDefaults = new Set(['breakfast', 'lunch', 'snacks', 'dinner']);
 
-    // Extract dynamic meal types from orderCounts and loaded orders
+    // Extract dynamic store categories from orderCounts and loaded orders
     const dynamicTypes = new Set();
     if (orderCounts) {
       Object.keys(orderCounts).forEach((k) => {
-        if (k !== 'combined' && k !== 'todays_menu_summary' && !knownIds.has(k)) {
-          dynamicTypes.add(k.toLowerCase());
+        const clean = k.toLowerCase().trim();
+        if (clean !== 'combined' && clean !== 'todays_menu_summary' && !legacyDefaults.has(clean)) {
+          dynamicTypes.add(clean);
         }
       });
     }
     if (Array.isArray(orders)) {
       orders.forEach((o) => {
-        if (o.meal_type && !knownIds.has(o.meal_type.toLowerCase())) {
-          dynamicTypes.add(o.meal_type.toLowerCase());
+        if (o.meal_type) {
+          const clean = o.meal_type.toLowerCase().trim();
+          if (clean && !legacyDefaults.has(clean)) {
+            dynamicTypes.add(clean);
+          }
         }
       });
     }
@@ -615,13 +617,13 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-orange-100 text-brand-orange flex items-center justify-center text-xl">
-              {isStaff ? '👨‍🍳' : '🔥'}
+            <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl">
+              {isStaff ? '🏪' : '🛒'}
             </span>
-            <span>{isStaff ? 'Kitchen Operations Screen' : 'Order Fulfillment Screen'}</span>
+            <span>{isStaff ? 'Store Counter Screen' : 'Order Fulfillment Screen'}</span>
           </h2>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            {isStaff ? "Live Active Token Queue & Today's Order Summary • " : "Live Active Token Queue & Daily Order Analytics • "}
+            {isStaff ? "Live Active Token Queue & Today's Orders • " : "Live Active Token Queue & Daily Order Analytics • "}
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',
               month: 'short',
@@ -742,7 +744,7 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
             {/* Combined Total Card */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 block">
-                COMBINED ALL MEALS
+                COMBINED ALL ORDERS
               </span>
               <div className="flex items-baseline justify-between pt-1">
                 <div>
@@ -760,47 +762,57 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
               </div>
             </div>
 
-            {/* Meal Specific Cards */}
-            {['breakfast', 'lunch', 'snacks', 'dinner'].map((meal) => {
-              const data = orderCounts[meal] || { total_orders_today: 0, active_tokens: 0 };
-              const label = meal.toUpperCase();
+            {/* Store Category Specific Cards (Dynamic Only) */}
+            {Object.keys(orderCounts || {})
+              .filter(
+                (k) =>
+                  k !== 'combined' &&
+                  k !== 'todays_menu_summary' &&
+                  !['breakfast', 'lunch', 'snacks', 'dinner'].includes(k.toLowerCase())
+              )
+              .map((catKey) => {
+                const data = orderCounts[catKey] || { total_orders_today: 0, active_tokens: 0 };
+                const label = catKey
+                  .split(/[\s_-]+/)
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(' ');
 
-              return (
-                <div
-                  key={meal}
-                  className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-2"
-                >
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 block">
-                    {label}
-                  </span>
-                  <div className="flex items-baseline justify-between pt-1">
-                    <div>
-                      <span className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
-                        {data.total_orders_today}
-                      </span>
-                      <span className="block text-[9px] font-semibold text-slate-400 mt-0.5">Total Orders</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xl sm:text-2xl font-black text-brand-orange leading-none">
-                        {data.active_tokens}
-                      </span>
-                      <span className="block text-[9px] font-bold text-brand-orange uppercase mt-0.5">ACTIVE</span>
+                return (
+                  <div
+                    key={catKey}
+                    className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-2"
+                  >
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 block">
+                      {label}
+                    </span>
+                    <div className="flex items-baseline justify-between pt-1">
+                      <div>
+                        <span className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
+                          {data.total_orders_today}
+                        </span>
+                        <span className="block text-[9px] font-semibold text-slate-400 mt-0.5">Total Orders</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl sm:text-2xl font-black text-brand-orange leading-none">
+                          {data.active_tokens}
+                        </span>
+                        <span className="block text-[9px] font-bold text-brand-orange uppercase mt-0.5">ACTIVE</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
           </div>
         </div>
 
-        {/* 4. TODAY'S MENU ORDERED ("WHAT'S COOKING TODAY") */}
+        {/* 4. TODAY'S PRODUCTS ORDERED ("FAST-MOVING ITEMS TODAY") */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2.5">
               <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <UtensilsCrossed className="w-4 h-4 text-brand-orange" />
-                <span>Today's Menu Ordered ("What's Cooking Today")</span>
+                <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                <span>Today's Products Ordered ("Fast-Moving Items Today")</span>
               </h3>
               {totalPendingUnits > 0 ? (
                 <span className="bg-amber-100 text-amber-900 border border-amber-300 font-black text-[11px] px-2.5 py-0.5 rounded-full shadow-2xs">
@@ -819,7 +831,7 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
 
           {menuSummaryWithPending.length === 0 ? (
             <div className="text-xs text-slate-400 font-medium py-4 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-              No menu items ordered yet today.
+              No grocery products ordered yet today.
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -981,7 +993,7 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
                 </h4>
                 <p className="text-slate-400 text-xs max-w-sm mx-auto">
                   {searchQuery.trim()
-                    ? 'Try adjusting your search term or selecting another meal tab.'
+                    ? 'Try adjusting your search term or selecting another category tab.'
                     : `All placed orders for ${selectedMeal === 'all' ? 'today' : selectedMeal} have been delivered.`}
                 </p>
               </div>
@@ -1102,7 +1114,7 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
                         {/* Items List Pills */}
                         <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
                           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                            Ordered Items:
+                            Ordered Products:
                           </span>
                           <div className="flex flex-wrap gap-1.5">
                             {(ord.items || []).map((it, idx) => (

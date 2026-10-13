@@ -10,7 +10,7 @@ const cleanEnvStr = (val) => {
   return str.length > 0 ? str : undefined;
 };
 
-// 1. Ensure .env is loaded safely without overriding existing runtime (cPanel/system) variables
+// 1. Ensure .env is loaded with override: true so the env-specified database takes precedence
 const initEnv = () => {
   const candidateEnvPaths = [
     path.resolve(__dirname, '../../.env'),         // backend/.env (from backend/src/database)
@@ -21,13 +21,12 @@ const initEnv = () => {
 
   for (const envPath of candidateEnvPaths) {
     if (fs.existsSync(envPath)) {
-      // NOTE: Do NOT use override: true so that cPanel runtime environment variables are preserved
-      dotenv.config({ path: envPath });
+      dotenv.config({ path: envPath, override: true });
       return envPath;
     }
   }
 
-  dotenv.config();
+  dotenv.config({ override: true });
   return null;
 };
 

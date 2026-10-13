@@ -179,7 +179,11 @@ export default function DiscountSettingsScreen() {
     try {
       const res = await api.get('/menu/windows');
       if (res.data && res.data.windows) {
-        setAvailableWindows(res.data.windows);
+        setAvailableWindows(
+          res.data.windows.filter(
+            (w) => !['breakfast', 'lunch', 'snacks', 'dinner'].includes((w.meal_type || '').toLowerCase())
+          )
+        );
       }
     } catch (e) {
       console.warn('Could not fetch windows for dropdown', e);
@@ -193,13 +197,9 @@ export default function DiscountSettingsScreen() {
       if (res.data && res.data.success) {
         const data = res.data.data;
 
-        // Default standard 4 rules if not in database yet
-        let rules = Array.isArray(data.meal_rules) && data.meal_rules.length > 0 ? data.meal_rules : [
-          { meal_type: 'breakfast', display_name: 'Early Breakfast Discount', discount_percentage: data.breakfast_early_discount_percentage != null ? Number(data.breakfast_early_discount_percentage) : 0, discount_start_time: data.breakfast_early_discount_start_time || '', cutoff_time: data.breakfast_early_discount_cutoff_time || '09:00', is_enabled: Boolean(data.breakfast_early_discount_enabled) },
-          { meal_type: 'lunch',     display_name: 'Early Lunch Discount',     discount_percentage: data.lunch_early_discount_percentage != null ? Number(data.lunch_early_discount_percentage) : 0, discount_start_time: data.lunch_early_discount_start_time || '', cutoff_time: data.lunch_early_discount_cutoff_time || '12:00', is_enabled: Boolean(data.lunch_early_discount_enabled) },
-          { meal_type: 'snacks',    display_name: 'Early Snacks Discount',    discount_percentage: data.snacks_early_discount_percentage != null ? Number(data.snacks_early_discount_percentage) : 0, discount_start_time: data.snacks_early_discount_start_time || '', cutoff_time: data.snacks_early_discount_cutoff_time || '17:00', is_enabled: Boolean(data.snacks_early_discount_enabled != null ? data.snacks_early_discount_enabled : true) },
-          { meal_type: 'dinner',    display_name: 'Early Dinner Discount',    discount_percentage: data.dinner_early_discount_percentage != null ? Number(data.dinner_early_discount_percentage) : 0, discount_start_time: data.dinner_early_discount_start_time || '', cutoff_time: data.dinner_early_discount_cutoff_time || '20:30', is_enabled: Boolean(data.dinner_early_discount_enabled != null ? data.dinner_early_discount_enabled : true) },
-        ];
+        // Custom store category rules only (exclude legacy food types)
+        let rules = Array.isArray(data.meal_rules) ? data.meal_rules : [];
+        rules = rules.filter((r) => !['breakfast', 'lunch', 'snacks', 'dinner'].includes((r.meal_type || '').toLowerCase()));
 
         const cleanData = {
           new_user_discount_enabled: Boolean(data.new_user_discount_enabled),
@@ -599,7 +599,7 @@ export default function DiscountSettingsScreen() {
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                Single source of truth: configure dynamic welcome deals & early-order discount rules for all meal types.
+                Single source of truth: configure dynamic welcome deals &amp; early-order discount rules for all store categories.
               </p>
             </div>
           </div>
@@ -634,7 +634,7 @@ export default function DiscountSettingsScreen() {
                     New User Welcome Deal
                   </h2>
                   <span className="text-[11px] text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
-                    Applies to ALL Meal Types
+                    Applies to ALL Categories
                   </span>
                 </div>
               </div>
@@ -779,9 +779,11 @@ export default function DiscountSettingsScreen() {
           </div>
         </div>
 
-        {/* DYNAMIC MEAL DISCOUNT RULES: Breakfast, Lunch, Snacks, Dinner + All Custom Meal Types */}
-        {settings.meal_rules.map((rule) => {
-          const isStandard = ['breakfast', 'lunch', 'snacks', 'dinner'].includes(rule.meal_type.toLowerCase());
+        {/* DYNAMIC STORE CATEGORY DISCOUNT RULES */}
+        {settings.meal_rules
+          .filter((rule) => !['breakfast', 'lunch', 'snacks', 'dinner'].includes(rule.meal_type.toLowerCase()))
+          .map((rule) => {
+          const isStandard = false;
           const visuals = getMealVisuals(rule.meal_type);
           const isDirty = isRuleDirty(rule);
           const isSavingThis = Boolean(savingCards[rule.meal_type]);

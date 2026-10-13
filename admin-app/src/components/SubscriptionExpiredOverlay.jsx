@@ -40,11 +40,11 @@ export default function SubscriptionExpiredOverlay({ onOpenRenewModal, subscript
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            This canteen's subscription has expired.
+            This store's subscription has expired.
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-            All system services (ordering, menu, kitchen screen, and reports) have been locked because the application recurring subscription ended on <span className="text-slate-200 font-bold">{formattedEndDate}</span>.
+            All system services (ordering, catalog, billing screen, and reports) have been locked because the application recurring subscription ended on <span className="text-slate-200 font-bold">{formattedEndDate}</span>.
           </p>
         </div>
 
@@ -52,7 +52,7 @@ export default function SubscriptionExpiredOverlay({ onOpenRenewModal, subscript
         {(isSuperAdmin || admin?.role === 'admin') ? (
           <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 space-y-4">
             <p className="text-xs text-amber-400 font-semibold">
-              ⚡ You can renew the subscription below to instantly reactivate access for the canteen.
+              ⚡ You can renew the subscription below to instantly reactivate access for the store.
             </p>
 
             <button
@@ -70,7 +70,7 @@ export default function SubscriptionExpiredOverlay({ onOpenRenewModal, subscript
               <span>Staff Account Notice</span>
             </p>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Please inform your Canteen Super Admin to pay the developer subscription fee to restore kitchen operations.
+              Please inform your Store Admin or Super Admin to pay the developer subscription fee to restore store operations.
             </p>
           </div>
         )}
@@ -87,7 +87,7 @@ export default function SubscriptionExpiredOverlay({ onOpenRenewModal, subscript
         </div>
 
         <div className="pt-1 text-[11px] text-slate-500">
-          MealBook • Canteen Management System
+          MealBook • Digital Kirana Management System
         </div>
       </div>
     </div>

@@ -93,11 +93,16 @@ export default function MenuReportScreen() {
     return matchesSearch && matchesCat;
   });
 
+  // Filtered categories excluding legacy food types
+  const filteredCategories = (reportData?.categories || []).filter(
+    (c) => !['breakfast', 'lunch', 'snacks', 'dinner'].includes((c.meal_type || '').toLowerCase())
+  );
+
   // Export report summary to CSV
   const handleExportCSV = () => {
     if (!reportData || !reportData.menu_items) return;
 
-    const headers = ['Item Name', 'Meal Category', 'Quantity Sold', 'Total Revenue (INR)', 'Orders Count', 'Share of Total Sales (%)', 'Current Stock'];
+    const headers = ['Product Name', 'Category', 'Units Sold', 'Total Revenue (INR)', 'Orders Count', 'Share of Total Sales (%)', 'Current Stock'];
     const rows = reportData.menu_items.map((it) => [
       `"${it.item_name.replace(/"/g, '""')}"`,
       it.meal_type,
@@ -112,7 +117,7 @@ export default function MenuReportScreen() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Menu_Report_${period}_${selectedDate || selectedMonth || selectedYear}.csv`);
+    link.setAttribute('download', `Product_Sales_Report_${period}_${selectedDate || selectedMonth || selectedYear}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -130,14 +135,14 @@ export default function MenuReportScreen() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  Menu Report
+                  Product Sales Report
                 </h1>
                 <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
                   Sales &amp; Stock Analytics
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                Analyze daily, weekly, monthly, and yearly sales volume, top recipes, and inventory consumption.
+                Analyze daily, weekly, monthly, and yearly sales volume, top-selling grocery items, and inventory consumption.
               </p>
             </div>
           </div>
@@ -328,19 +333,19 @@ export default function MenuReportScreen() {
               </p>
             </div>
 
-            {/* Total Portions Sold */}
+            {/* Total Units Sold */}
             <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-black uppercase tracking-wider">Total Portions Sold</span>
+                <span className="text-[11px] font-black uppercase tracking-wider">Total Units Sold</span>
                 <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <Utensils className="w-4 h-4" />
+                  <Package className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 {reportData?.summary?.total_items_sold || 0}
               </div>
               <p className="text-[11px] font-semibold text-slate-400">
-                Portions served to users
+                Units sold to customers
               </p>
             </div>
 
@@ -361,49 +366,47 @@ export default function MenuReportScreen() {
             </div>
           </div>
 
-          {/* 4. Meal Categories Breakdown */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {['breakfast', 'lunch', 'snacks', 'dinner'].map((cat) => {
-              const catData = (reportData?.categories || []).find((c) => c.meal_type === cat) || {
-                orders_count: 0,
-                revenue: 0,
-                items_sold: 0,
-              };
-              const badgeStyle = MEAL_BADGE_COLORS[cat] || 'bg-slate-100 text-slate-700 border-slate-200';
+          {/* 4. Product Categories Breakdown */}
+          {filteredCategories.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {filteredCategories.map((catData) => {
+                const cat = (catData.meal_type || '').toLowerCase();
+                const badgeStyle = MEAL_BADGE_COLORS[cat] || 'bg-slate-100 text-slate-700 border-slate-200';
 
-              return (
-                <div key={cat} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase border ${badgeStyle}`}>
-                      {cat}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">
-                      {catData.orders_count} orders
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="text-xl font-black text-slate-900">
-                      ₹{Number(catData.revenue).toFixed(2)}
+                return (
+                  <div key={cat} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase border ${badgeStyle}`}>
+                        {cat}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        {catData.orders_count || 0} orders
+                      </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                      {catData.items_sold} portions sold
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
 
-          {/* 5. Menu Items Performance Table */}
+                    <div>
+                      <div className="text-xl font-black text-slate-900">
+                        ₹{Number(catData.revenue || 0).toFixed(2)}
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                        {catData.items_sold || 0} units sold
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 5. Product Performance Table */}
           <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                  Item-by-Item Sales Performance
+                  Product Sales Performance
                 </h3>
                 <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                  Breakdown of portions ordered, generated sales, and current portion inventory.
+                  Breakdown of units ordered, generated sales, and current store inventory.
                 </p>
               </div>
 
@@ -413,7 +416,7 @@ export default function MenuReportScreen() {
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    placeholder="Search menu item..."
+                    placeholder="Search product..."
                     value={searchItem}
                     onChange={(e) => setSearchItem(e.target.value)}
                     className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
@@ -423,21 +426,22 @@ export default function MenuReportScreen() {
                 <select
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer capitalize"
                 >
                   <option value="all">All Categories</option>
-                  <option value="breakfast">Breakfast</option>
-                  <option value="lunch">Lunch</option>
-                  <option value="snacks">Snacks</option>
-                  <option value="dinner">Dinner</option>
+                  {filteredCategories.map((c) => (
+                    <option key={c.meal_type} value={c.meal_type}>
+                      {c.meal_type}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
             {filteredItems.length === 0 ? (
               <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl text-slate-400">
-                <Utensils className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p className="text-xs font-bold">No menu sales recorded for this period &amp; filter.</p>
+                <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-xs font-bold">No product sales recorded for this period &amp; filter.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -445,9 +449,9 @@ export default function MenuReportScreen() {
                   <thead>
                     <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-400">
                       <th className="py-3 px-3">#</th>
-                      <th className="py-3 px-3">Menu Item</th>
-                      <th className="py-3 px-3">Meal Category</th>
-                      <th className="py-3 px-3 text-right">Portions Sold</th>
+                      <th className="py-3 px-3">Product Name</th>
+                      <th className="py-3 px-3">Category</th>
+                      <th className="py-3 px-3 text-right">Units Sold</th>
                       <th className="py-3 px-3 text-right">Total Revenue</th>
                       <th className="py-3 px-3 text-right">Share of Sales</th>
                       <th className="py-3 px-3 text-right">Remaining Stock</th>
@@ -522,10 +526,10 @@ export default function MenuReportScreen() {
             <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-3">
               <div>
                 <h3 className="text-base font-black text-slate-900 tracking-tight">
-                  Raw Inventory Consumption ({reportData.period_title})
+                  Stock &amp; Store Inventory Consumption ({reportData.period_title})
                 </h3>
                 <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                  Ingredient usage automatically deducted by prepared user orders during this selected timeframe.
+                  Inventory automatically deducted by fulfilled customer orders during this selected timeframe.
                 </p>
               </div>
 

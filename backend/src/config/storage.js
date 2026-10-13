@@ -83,7 +83,7 @@ const formatPublicImageUrl = (imageUrl, req) => {
       baseUrl = `${req.protocol}://${req.get('host')}`;
     }
     if (!baseUrl) {
-      baseUrl = 'https://matoshree-api.mealbook.in';
+      baseUrl = 'https://matoshree-kirana.onrender.com';
     }
     return `${baseUrl.replace(/\/+$/, '')}${imageUrl}`;
   }

@@ -79,11 +79,11 @@ export default function OrderHistoryModal({ isOpen, onClose }) {
             <div className="flex items-center gap-2.5 min-w-0">
               <img
                 src={CAFE_D_CRUZE_LOGO}
-                alt="Le Safran Foods Logo"
+                alt="Matoshree Kirana Logo"
                 className="w-9 h-9 rounded-xl object-contain bg-white p-0.5 border border-amber-200 shadow-sm shrink-0"
               />
               <div className="min-w-0">
-                <h2 className="font-display font-extrabold text-base sm:text-lg text-brand-dark truncate">Le Safran Foods • Orders</h2>
+                <h2 className="font-display font-extrabold text-base sm:text-lg text-brand-dark truncate">Matoshree Kirana • Orders</h2>
                 <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium truncate">Tap any order to view details & scannable QR</p>
               </div>
             </div>

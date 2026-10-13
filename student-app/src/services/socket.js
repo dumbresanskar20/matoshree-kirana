@@ -14,7 +14,7 @@ export const getSocketUrl = () => {
     return cleanApi.replace(/\/api\/?$/i, '');
   }
 
-  return 'https://matoshree-api.mealbook.in';
+  return 'https://matoshree-kirana.onrender.com';
 };
 
 export const createSocketClient = (authToken = null) => {

@@ -257,7 +257,7 @@ const validateSlotPayload = (slot, slotNumber = 1) => {
   };
 };
 
-const DEFAULT_MEAL_TYPES = ['breakfast', 'lunch', 'snacks', 'dinner'];
+const DEFAULT_MEAL_TYPES = [];
 
 /**
  * Get all meal slots grouped by meal_type

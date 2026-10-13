@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Receipt,
-  UtensilsCrossed,
+  ShoppingBag,
 } from 'lucide-react';
 
 export default function TokenDetailModal({
@@ -48,7 +48,7 @@ export default function TokenDetailModal({
     mobile_number: order.mobile_number,
   } : null);
 
-  const studentName = order.customer_name || order.student_name || order.student?.name || 'Walk-in Student';
+  const studentName = order.customer_name || order.student_name || order.student?.name || 'Walk-in Customer';
   const mobileNumber = address?.mobile_number || order.student_phone || order.phone || 'Not provided';
 
   const formattedTime = order.created_at
@@ -153,7 +153,7 @@ export default function TokenDetailModal({
                 <User className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-stone-400 block">Student Name</span>
+                <span className="text-[10px] uppercase font-bold text-stone-400 block">Customer Name</span>
                 <span className="font-extrabold text-stone-900 truncate block text-sm">{studentName}</span>
               </div>
             </div>
@@ -198,15 +198,15 @@ export default function TokenDetailModal({
             )}
           </div>
 
-          {/* Ordered Menu Items Table */}
+          {/* Ordered Products Table */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs font-black text-stone-800">
               <span className="flex items-center gap-1.5">
-                <UtensilsCrossed className="w-4 h-4 text-brand-orange" />
-                <span>Ordered Items</span>
+                <ShoppingBag className="w-4 h-4 text-brand-orange" />
+                <span>Ordered Products</span>
               </span>
               <span className="text-[11px] font-bold text-stone-500">
-                {(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}
+                {(order.items || []).length} product{(order.items || []).length === 1 ? '' : 's'}
               </span>
             </div>
 
@@ -214,7 +214,7 @@ export default function TokenDetailModal({
               <table className="w-full text-left text-xs">
                 <thead className="bg-stone-100 text-stone-700 font-extrabold text-[11px] border-b border-stone-200">
                   <tr>
-                    <th className="py-2.5 px-3">Item</th>
+                    <th className="py-2.5 px-3">Product</th>
                     <th className="py-2.5 px-3 text-center">Qty</th>
                     <th className="py-2.5 px-3 text-right">Price</th>
                     <th className="py-2.5 px-3 text-right">Total</th>
@@ -270,8 +270,11 @@ export default function TokenDetailModal({
 
             <div className="flex justify-between items-center text-[11px] text-stone-500 pt-1">
               <span>Payment Status / Method</span>
-              <span className="font-bold text-stone-700 uppercase">
-                {order.payment_status || 'paid'} • {order.payment_method || 'counter'}
+              <span className="font-bold flex items-center gap-1.5">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${String(order.payment_status || '').toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  {String(order.payment_status || '').toLowerCase() === 'paid' ? 'Paid' : 'Unpaid'}
+                </span>
+                <span className="text-stone-500 uppercase text-[10px] font-bold">• {order.payment_method || 'counter'}</span>
               </span>
             </div>
           </div>

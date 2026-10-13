@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Clock, Save, Check, AlertCircle, Sparkles, Sun, CheckCircle, 
-  Bell, Eye, EyeOff, Utensils, Edit2, X, Calendar, ArrowRight, ShieldCheck
+  Clock, Save, Check, AlertCircle, Sparkles, CheckCircle, 
+  Bell, Calendar, Store, ArrowRight
 } from 'lucide-react';
 import api from '../services/api';
 import { createAdminSocketClient } from '../services/socket';
 
-const DEFAULT_MEAL_TYPES = ['breakfast', 'lunch', 'snacks', 'dinner'];
+const LEGACY_MEAL_TYPES = ['breakfast', 'lunch', 'snacks', 'dinner'];
 
-const MEAL_ICONS = {
-  breakfast: '🌅',
-  lunch: '☀️',
-  snacks: '☕',
-  dinner: '🌙',
+const STORE_CATEGORY_ICONS = {
+  store_hours: '🏬',
+  groceries: '🛒',
+  grocery: '🛒',
+  grains: '🌾',
+  spices: '🌶️',
+  oils: '🛢️',
+  dairy: '🥛',
+  beverages: '🧃',
+  packaged_food: '📦',
+  general: '🏬',
 };
 
 // Formats ISO string (or Date) to input 'YYYY-MM-DDTHH:mm' in local/IST
@@ -27,9 +33,9 @@ const formatForInput = (dt) => {
   const year = d.getFullYear();
   const month = pad(d.getMonth() + 1);
   const day = pad(d.getDate());
-  const hours = pad(d.getHours());
-  const minutes = pad(d.getMinutes());
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  return `${year}-${month}-${day}T${pad(hours)}:${pad(minutes)}`;
 };
 
 // Format human-readable date & time in IST: "Sat, 4 Oct, 12:30 PM"
@@ -48,10 +54,10 @@ const formatISTHuman = (dt) => {
   });
 };
 
-// Calculates live status badge for a single slot
+// Calculates live status badge for the store operating hours slot
 const getSlotStatus = (slot) => {
   if (!slot || !slot.is_active) {
-    return { label: 'Inactive', color: 'bg-slate-100 text-slate-600 border-slate-200' };
+    return { label: 'Closed / Inactive', color: 'bg-slate-100 text-slate-600 border-slate-200' };
   }
   if (!slot.start_datetime || !slot.end_datetime) {
     return { label: 'Incomplete', color: 'bg-amber-100 text-amber-800 border-amber-300' };
@@ -60,12 +66,12 @@ const getSlotStatus = (slot) => {
   const start = new Date(slot.start_datetime);
   const end = new Date(slot.end_datetime);
   if (now >= start && now <= end) {
-    return { label: 'Running now', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black' };
+    return { label: 'Open Now', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black' };
   }
   if (now < start) {
     return { label: 'Upcoming', color: 'bg-blue-100 text-blue-800 border-blue-300' };
   }
-  return { label: 'Expired', color: 'bg-rose-100 text-rose-700 border-rose-200' };
+  return { label: 'Closed (Expired)', color: 'bg-rose-100 text-rose-700 border-rose-200' };
 };
 
 const buildDefaultMeal = (type) => ({
@@ -81,11 +87,11 @@ const buildDefaultMeal = (type) => ({
   isAvailableNow: false,
   activeSlot: null,
   nextSlot: null,
-  serving_note: 'Not available right now',
+  serving_note: 'Store closed right now',
 });
 
-// Computes the dynamic note to show on the User app
-const getComputedUserNote = (meal, slot1, slot2, isRunningNow, isUpcoming, status1) => {
+// Computes the dynamic note to show on the Customer app
+const getComputedUserNote = (meal, slot, isRunningNow, isUpcoming) => {
   if (meal.is_full_day) {
     if (meal.note_datetime) {
       const formattedDt = formatISTHuman(meal.note_datetime);
@@ -105,8 +111,8 @@ const getComputedUserNote = (meal, slot1, slot2, isRunningNow, isUpcoming, statu
     if (meal.note_prefix === 'Custom Note') {
       return meal.custom_note ? `${meal.custom_note} (${formattedDt})` : `Notice: ${formattedDt}`;
     }
-    const prefix = meal.note_prefix || (isRunningNow ? 'Serving now until' : 'Available from');
-    const icon = prefix.toLowerCase().includes('serving') ? '🟢' : '⏳';
+    const prefix = meal.note_prefix || (isRunningNow ? 'Store open now until' : 'Store opens at');
+    const icon = prefix.toLowerCase().includes('open') ? '🟢' : '⏳';
     return `${icon} ${prefix} ${formattedDt}`;
   }
 
@@ -114,19 +120,17 @@ const getComputedUserNote = (meal, slot1, slot2, isRunningNow, isUpcoming, statu
     return `📢 ${meal.custom_note}`;
   }
 
-  if (isRunningNow) {
-    const runEnd = status1.label === 'Running now' ? slot1.end_datetime : slot2.end_datetime;
-    return `🟢 Serving now until ${formatISTHuman(runEnd)}`;
+  if (isRunningNow && slot?.end_datetime) {
+    return `🟢 Store open now until ${formatISTHuman(slot.end_datetime)}`;
   }
-  if (isUpcoming) {
-    const upStart = status1.label === 'Upcoming' ? slot1.start_datetime : slot2.start_datetime;
-    return `⏳ Available from ${formatISTHuman(upStart)}`;
+  if (isUpcoming && slot?.start_datetime) {
+    return `⏳ Store opening at ${formatISTHuman(slot.start_datetime)}`;
   }
-  return '🚫 Not available right now';
+  return '🚫 Store closed right now';
 };
 
 export default function MealTimings() {
-  const [meals, setMeals] = useState(() => DEFAULT_MEAL_TYPES.map(buildDefaultMeal));
+  const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingMap, setSavingMap] = useState({});
   const [notification, setNotification] = useState(null);
@@ -147,16 +151,16 @@ export default function MealTimings() {
   const fetchMealSlots = async () => {
     setLoading(true);
     try {
-      let rawMeals = null;
+      let rawMeals = [];
 
       // 1. Try primary endpoint: /admin/meal-slots
       try {
         const res = await api.get('/admin/meal-slots');
         if (res.data && res.data.success) {
           const raw = res.data.meals || res.data.data;
-          if (Array.isArray(raw) && raw.length > 0) {
+          if (Array.isArray(raw)) {
             rawMeals = raw;
-          } else if (raw && typeof raw === 'object' && Object.keys(raw).length > 0) {
+          } else if (raw && typeof raw === 'object') {
             rawMeals = Object.entries(raw).map(([key, val]) => ({
               meal_type: val.meal_type || key,
               ...val,
@@ -167,118 +171,90 @@ export default function MealTimings() {
         console.warn('GET /admin/meal-slots notice:', adminErr?.message);
       }
 
-      // 2. Fallback to /menu/windows (which already has slots data)
-      if (!rawMeals || rawMeals.length === 0) {
-        try {
-          const resWin = await api.get('/menu/windows');
-          if (resWin.data && resWin.data.success && Array.isArray(resWin.data.windows) && resWin.data.windows.length > 0) {
-            rawMeals = resWin.data.windows.map((w) => {
-              const type = (w.meal_type || '').toLowerCase();
-              let slots = w.slots || [];
-              if (!Array.isArray(slots) || slots.length === 0) {
-                const today = new Date().toISOString().split('T')[0];
-                const sTime = w.start_time || '08:00';
-                const eTime = w.end_time || '20:00';
-                slots = [
-                  {
-                    slot_number: 1,
-                    is_active: Boolean(w.is_active),
-                    start_datetime: `${today}T${sTime}`,
-                    end_datetime: `${today}T${eTime}`,
-                    note: w.custom_note || '',
-                  },
-                  {
-                    slot_number: 2,
-                    is_active: false,
-                    start_datetime: '',
-                    end_datetime: '',
-                    note: '',
-                  },
-                ];
-              }
-              return {
-                ...w,
-                meal_type: type,
-                slots,
-                isAvailableNow: Boolean(w.isAvailableNow ?? w.is_currently_open),
-                activeSlot: w.activeSlot || null,
-                nextSlot: w.nextSlot || null,
-                serving_note: w.serving_note || '',
-                custom_note: w.custom_note || '',
-              };
-            });
-          }
-        } catch (winErr) {
-          console.warn('GET /menu/windows fallback notice:', winErr?.message);
+      // 2. Fetch /menu/windows
+      let windows = [];
+      try {
+        const resWin = await api.get('/menu/windows');
+        if (resWin.data && resWin.data.success && Array.isArray(resWin.data.windows)) {
+          windows = resWin.data.windows;
         }
+      } catch (winErr) {
+        console.warn('GET /menu/windows notice:', winErr?.message);
       }
 
-      // 3. Assemble complete meal list guaranteeing all 4 default meal types exist
-      const assembled = DEFAULT_MEAL_TYPES.map((type) => {
-        const found = rawMeals?.find((m) => (m.meal_type || '').toLowerCase() === type);
-        if (found) {
-          const s1 = found.slots?.find((s) => s.slot_number === 1) || {
-            slot_number: 1,
-            is_active: false,
-            start_datetime: '',
-            end_datetime: '',
-            note: '',
-          };
-          const s2 = found.slots?.find((s) => s.slot_number === 2) || {
-            slot_number: 2,
-            is_active: false,
-            start_datetime: '',
-            end_datetime: '',
-            note: '',
-          };
-          return {
-            ...found,
-            meal_type: type,
-            is_full_day: Boolean(found.is_full_day),
-            slots: [s1, s2],
-            note_datetime: found.note_datetime || '',
-            note_prefix: found.note_prefix || 'Available from',
-            custom_note: found.custom_note || '',
-          };
+      // 3. Discover categories from /menu/items
+      let itemCategories = [];
+      try {
+        const resItems = await api.get('/menu/items');
+        if (resItems.data && resItems.data.success && Array.isArray(resItems.data.items)) {
+          itemCategories = resItems.data.items
+            .map((i) => (i.meal_type || i.category || '').toLowerCase().trim())
+            .filter((c) => Boolean(c) && !LEGACY_MEAL_TYPES.includes(c));
         }
-        return buildDefaultMeal(type);
+      } catch (itemErr) {
+        console.warn('GET /menu/items notice:', itemErr?.message);
+      }
+
+      // Collect all non-legacy category names
+      const allCategoryNames = new Set();
+      rawMeals.forEach((m) => {
+        const t = (m.meal_type || '').toLowerCase().trim();
+        if (t && !LEGACY_MEAL_TYPES.includes(t)) allCategoryNames.add(t);
       });
+      windows.forEach((w) => {
+        const t = (w.meal_type || '').toLowerCase().trim();
+        if (t && !LEGACY_MEAL_TYPES.includes(t)) allCategoryNames.add(t);
+      });
+      itemCategories.forEach((c) => allCategoryNames.add(c));
 
-      // Also append any additional meal categories from DB (e.g. 'coffee')
-      if (Array.isArray(rawMeals)) {
-        rawMeals.forEach((m) => {
-          const type = (m.meal_type || '').toLowerCase();
-          if (type && !DEFAULT_MEAL_TYPES.includes(type)) {
-            const s1 = m.slots?.find((s) => s.slot_number === 1) || {
-              slot_number: 1,
-              is_active: false,
-              start_datetime: '',
-              end_datetime: '',
-              note: '',
-            };
-            const s2 = m.slots?.find((s) => s.slot_number === 2) || {
-              slot_number: 2,
-              is_active: false,
-              start_datetime: '',
-              end_datetime: '',
-              note: '',
-            };
-            assembled.push({
-              ...m,
-              meal_type: type,
-              is_full_day: Boolean(m.is_full_day),
-              slots: [s1, s2],
-              note_datetime: m.note_datetime || '',
-              note_prefix: m.note_prefix || 'Available from',
-              custom_note: m.custom_note || '',
-            });
-          }
-        });
+      // Fallback: If no custom category exists yet, provide a primary "Store Operating Hours" window
+      if (allCategoryNames.size === 0) {
+        allCategoryNames.add('store_hours');
       }
+
+      const assembled = Array.from(allCategoryNames).map((type) => {
+        const found = rawMeals.find((m) => (m.meal_type || '').toLowerCase().trim() === type);
+        const foundWin = windows.find((w) => (w.meal_type || '').toLowerCase().trim() === type);
+
+        // Find primary slot or build from window
+        const slot1 = found?.slots?.find((s) => s.slot_number === 1) || foundWin?.slots?.[0] || {
+          slot_number: 1,
+          is_active: Boolean(foundWin?.is_active),
+          start_datetime: foundWin?.start_time ? `${new Date().toISOString().split('T')[0]}T${foundWin.start_time}` : '',
+          end_datetime: foundWin?.end_time ? `${new Date().toISOString().split('T')[0]}T${foundWin.end_time}` : '',
+          note: '',
+        };
+
+        const cleanStart = formatForInput(slot1.start_datetime);
+        const cleanEnd = formatForInput(slot1.end_datetime);
+
+        return {
+          meal_type: type,
+          is_full_day: Boolean(found?.is_full_day ?? foundWin?.is_full_day),
+          slots: [
+            {
+              ...slot1,
+              slot_number: 1,
+              start_datetime: cleanStart,
+              end_datetime: cleanEnd,
+            },
+            {
+              ...slot1,
+              slot_number: 2,
+              start_datetime: cleanStart,
+              end_datetime: cleanEnd,
+            },
+          ],
+          note_datetime: found?.note_datetime || '',
+          note_prefix: found?.note_prefix || 'Available from',
+          custom_note: found?.custom_note || foundWin?.custom_note || '',
+          isAvailableNow: Boolean(found?.isAvailableNow ?? foundWin?.isAvailableNow ?? foundWin?.is_currently_open),
+        };
+      });
 
       setMeals(assembled);
     } catch (err) {
-      console.error('Error fetching meal slots:', err);
+      console.error('Error fetching store timings:', err);
     } finally {
       setLoading(false);
     }
@@ -305,33 +281,32 @@ export default function MealTimings() {
     };
   }, []);
 
-  // Update a specific field for a slot (1 or 2)
-  const handleSlotChange = (mealIndex, slotNumber, field, value) => {
+  // Update field for the single store timing slot (synchronizes slot 1 and slot 2)
+  const handleSlotChange = (mealIndex, field, value) => {
     setMeals((prev) => {
       const copy = [...prev];
       const targetMeal = { ...copy[mealIndex] };
-      const slotIndex = slotNumber === 1 ? 0 : 1;
-      const targetSlots = [...(targetMeal.slots || [])];
+      const currentSlots = targetMeal.slots || [];
+      const baseSlot = currentSlots[0] || {
+        slot_number: 1,
+        is_active: false,
+        start_datetime: '',
+        end_datetime: '',
+        note: '',
+      };
 
-      if (!targetSlots[slotIndex]) {
-        targetSlots[slotIndex] = {
-          slot_number: slotNumber,
-          is_active: false,
-          start_datetime: '',
-          end_datetime: '',
-          note: '',
-        };
-      } else {
-        targetSlots[slotIndex] = { ...targetSlots[slotIndex], [field]: value };
-      }
+      const updatedSlot = { ...baseSlot, [field]: value };
+      targetMeal.slots = [
+        { ...updatedSlot, slot_number: 1 },
+        { ...updatedSlot, slot_number: 2 },
+      ];
 
-      targetMeal.slots = targetSlots;
       copy[mealIndex] = targetMeal;
       return copy;
     });
 
     // Clear inline error on change
-    const errKey = `${meals[mealIndex].meal_type}_slot${slotNumber}`;
+    const errKey = `${meals[mealIndex]?.meal_type}_slot`;
     if (errorsMap[errKey]) {
       setErrorsMap((prev) => {
         const next = { ...prev };
@@ -341,7 +316,7 @@ export default function MealTimings() {
     }
   };
 
-  // Update top-level field for a meal (e.g. note_datetime, note_prefix, custom_note, is_full_day)
+  // Update top-level field for category (note_datetime, note_prefix, custom_note, is_full_day)
   const handleMealFieldChange = (mealIndex, field, value) => {
     setMeals((prev) => {
       const copy = [...prev];
@@ -350,44 +325,39 @@ export default function MealTimings() {
     });
   };
 
-  // Validate slots before sending
-  const validateSlots = (meal) => {
+  // Validate single slot before sending
+  const validateSlot = (meal) => {
     const errors = {};
-    const slots = meal.slots || [];
+    const slot = (meal.slots || [])[0];
+    const key = `${meal.meal_type}_slot`;
 
-    slots.forEach((s) => {
-      const sNum = s.slot_number || 1;
-      const slotLabel = sNum === 1 ? 'Pre Order Slot' : 'Same day Slot';
-      const key = `${meal.meal_type}_slot${sNum}`;
-
-      if (s.is_active) {
-        if (!s.start_datetime || !s.end_datetime) {
-          errors[key] = `Start and end date & time are required when ${slotLabel} is Active.`;
-          return;
-        }
-
-        const start = new Date(s.start_datetime).getTime();
-        const end = new Date(s.end_datetime).getTime();
-
-        if (isNaN(start) || isNaN(end)) {
-          errors[key] = 'Invalid date or time format.';
-          return;
-        }
-
-        if (end <= start) {
-          errors[key] = `${slotLabel}: End date-time must be strictly after start date-time.`;
-          return;
-        }
+    if (slot && slot.is_active) {
+      if (!slot.start_datetime || !slot.end_datetime) {
+        errors[key] = 'Store opening and closing date & time are required when Store Timing is Active.';
+        return errors;
       }
-    });
+
+      const start = new Date(slot.start_datetime).getTime();
+      const end = new Date(slot.end_datetime).getTime();
+
+      if (isNaN(start) || isNaN(end)) {
+        errors[key] = 'Invalid date or time format.';
+        return errors;
+      }
+
+      if (end <= start) {
+        errors[key] = 'Store closing time must be strictly after store opening time.';
+        return errors;
+      }
+    }
 
     return errors;
   };
 
-  // Save both Pre Order Slot & Same day Slot in one request
+  // Save single store timing slot (applies identically to pre-order and same-day order)
   const handleSaveMeal = async (mealIndex) => {
     const meal = meals[mealIndex];
-    const validationErrors = validateSlots(meal);
+    const validationErrors = validateSlot(meal);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrorsMap((prev) => ({ ...prev, ...validationErrors }));
@@ -398,43 +368,45 @@ export default function MealTimings() {
     setSavingMap((prev) => ({ ...prev, [meal.meal_type]: true }));
 
     try {
-      const slot1Obj = (meal.slots || []).find((s) => s.slot_number === 1) || null;
-      const slot2Obj = (meal.slots || []).find((s) => s.slot_number === 2) || null;
-      const status1 = getSlotStatus(slot1Obj);
-      const isRunningNow = meal.is_full_day || status1.label === 'Running now' || getSlotStatus(slot2Obj).label === 'Running now';
-      const isUpcoming = !meal.is_full_day && (status1.label === 'Upcoming' || getSlotStatus(slot2Obj).label === 'Upcoming');
+      const slotObj = (meal.slots || [])[0] || { slot_number: 1, is_active: false };
+      const status = getSlotStatus(slotObj);
+      const isRunningNow = meal.is_full_day || status.label === 'Open Now';
+      const isUpcoming = !meal.is_full_day && status.label === 'Upcoming';
 
-      const userNoteText = getComputedUserNote(meal, slot1Obj, slot2Obj, isRunningNow, isUpcoming, status1);
+      const userNoteText = getComputedUserNote(meal, slotObj, isRunningNow, isUpcoming);
 
-      const formatSlotForPayload = (s) => {
-        if (!s) return null;
-        let startIso = null;
-        let endIso = null;
-        if (s.start_datetime) {
-          const d = new Date(s.start_datetime);
-          startIso = isNaN(d.getTime()) ? s.start_datetime : d.toISOString();
-        }
-        if (s.end_datetime) {
-          const d = new Date(s.end_datetime);
-          endIso = isNaN(d.getTime()) ? s.end_datetime : d.toISOString();
-        }
-        return {
-          slot_number: s.slot_number,
-          start_datetime: startIso,
-          end_datetime: endIso,
-          is_active: Boolean(s.is_active) ? 1 : 0,
-          note: s.note || '',
-        };
+      let startIso = null;
+      let endIso = null;
+      if (slotObj.start_datetime) {
+        const d = new Date(slotObj.start_datetime);
+        startIso = isNaN(d.getTime()) ? slotObj.start_datetime : d.toISOString();
+      }
+      if (slotObj.end_datetime) {
+        const d = new Date(slotObj.end_datetime);
+        endIso = isNaN(d.getTime()) ? slotObj.end_datetime : d.toISOString();
+      }
+
+      // Same timing for both slot 1 (pre-order) and slot 2 (same-day)
+      const slot1Payload = {
+        slot_number: 1,
+        start_datetime: startIso,
+        end_datetime: endIso,
+        is_active: Boolean(slotObj.is_active) ? 1 : 0,
+        note: slotObj.note || '',
       };
-
-      const s1Formatted = formatSlotForPayload(slot1Obj);
-      const s2Formatted = formatSlotForPayload(slot2Obj);
+      const slot2Payload = {
+        slot_number: 2,
+        start_datetime: startIso,
+        end_datetime: endIso,
+        is_active: Boolean(slotObj.is_active) ? 1 : 0,
+        note: slotObj.note || '',
+      };
 
       const payload = {
         is_full_day: Boolean(meal.is_full_day),
-        slots: [s1Formatted, s2Formatted].filter(Boolean),
-        slot1: s1Formatted,
-        slot2: s2Formatted,
+        slots: [slot1Payload, slot2Payload],
+        slot1: slot1Payload,
+        slot2: slot2Payload,
         note_datetime: meal.note_datetime ? new Date(meal.note_datetime).toISOString() : null,
         note_prefix: meal.note_prefix || 'Available from',
         custom_note: userNoteText,
@@ -446,13 +418,12 @@ export default function MealTimings() {
         res = await api.put(`/admin/meal-slots/${meal.meal_type}`, payload);
       } catch (putErr) {
         if (putErr.response?.status === 404) {
-          const s1 = slot1Obj;
-          const sTime = s1?.start_datetime ? new Date(s1.start_datetime).toTimeString().substring(0, 5) : '08:00';
-          const eTime = s1?.end_datetime ? new Date(s1.end_datetime).toTimeString().substring(0, 5) : '20:00';
+          const sTime = slotObj?.start_datetime ? new Date(slotObj.start_datetime).toTimeString().substring(0, 5) : '08:00';
+          const eTime = slotObj?.end_datetime ? new Date(slotObj.end_datetime).toTimeString().substring(0, 5) : '20:00';
           res = await api.put(`/menu/windows/${meal.meal_type}`, {
             start_time: sTime,
             end_time: eTime,
-            is_active: Boolean(meal.is_full_day || slot1Obj?.is_active || slot2Obj?.is_active),
+            is_active: Boolean(meal.is_full_day || slotObj?.is_active),
             is_full_day: Boolean(meal.is_full_day),
             custom_note: userNoteText,
           });
@@ -462,13 +433,13 @@ export default function MealTimings() {
       }
 
       if (res.data && res.data.success) {
-        showToast(`Timing slots for ${meal.meal_type.toUpperCase()} saved successfully!`);
+        showToast(`Store timings for ${meal.meal_type.replace(/_/g, ' ').toUpperCase()} saved successfully!`);
         fetchMealSlots();
       } else {
-        showToast(res.data?.message || 'Failed to save meal slots.', 'error');
+        showToast(res.data?.message || 'Failed to save store timing.', 'error');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Error saving meal timing windows.';
+      const msg = err.response?.data?.message || 'Error saving store timing.';
       showToast(msg, 'error');
     } finally {
       setSavingMap((prev) => ({ ...prev, [meal.meal_type]: false }));
@@ -494,15 +465,15 @@ export default function MealTimings() {
         <div>
           <div className="flex items-center gap-2">
             <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full">
-              2-Slot Date &amp; Time System (Pre Order &amp; Same Day)
+              Single Store Operating Hours
             </span>
             <span className="text-slate-400 text-xs font-bold">IST (Asia/Kolkata)</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
-            Meal Timing Windows
+            Store Operating Hours &amp; Timings
           </h2>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            Configure two serving windows (Pre Order Slot &amp; Same day Slot) or enable 24/7 ordering per meal type with dates, times, custom user notice date/time, and live Active toggles.
+            Configure store opening and closing times or enable 24/7 ordering with live status, customer notice, and active toggles. The same timing applies to both pre-orders and same-day orders.
           </p>
         </div>
 
@@ -517,15 +488,22 @@ export default function MealTimings() {
       {loading ? (
         <div className="text-center py-20 text-slate-400 font-bold flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <span>Loading meal configuration slots...</span>
+          <span>Loading store operating hours...</span>
+        </div>
+      ) : meals.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center">
+          <Store className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-slate-700">No Store Categories Found</h3>
+          <p className="text-sm text-slate-400 mt-1">Add items or categories in Store Catalog to configure timings.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {meals.map((meal, mealIdx) => {
-            const capitalizedMeal = meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1);
+            const rawName = meal.meal_type.replace(/_/g, ' ');
+            const displayName = rawName === 'store hours' ? 'Store Operating Hours' : rawName.charAt(0).toUpperCase() + rawName.slice(1);
             const isSaving = Boolean(savingMap[meal.meal_type]);
 
-            const slot1 = (meal.slots || []).find((s) => s.slot_number === 1) || {
+            const slot = (meal.slots || [])[0] || {
               slot_number: 1,
               is_active: false,
               start_datetime: '',
@@ -533,37 +511,26 @@ export default function MealTimings() {
               note: '',
             };
 
-            const slot2 = (meal.slots || []).find((s) => s.slot_number === 2) || {
-              slot_number: 2,
-              is_active: false,
-              start_datetime: '',
-              end_datetime: '',
-              note: '',
-            };
-
-            const status1 = getSlotStatus(slot1);
-            const status2 = getSlotStatus(slot2);
-            const isRunningNow = meal.is_full_day || status1.label === 'Running now' || status2.label === 'Running now';
-            const isUpcoming = !meal.is_full_day && (status1.label === 'Upcoming' || status2.label === 'Upcoming');
-
-            const errSlot1 = errorsMap[`${meal.meal_type}_slot1`];
-            const errSlot2 = errorsMap[`${meal.meal_type}_slot2`];
+            const status = getSlotStatus(slot);
+            const isRunningNow = meal.is_full_day || status.label === 'Open Now';
+            const isUpcoming = !meal.is_full_day && status.label === 'Upcoming';
+            const errSlot = errorsMap[`${meal.meal_type}_slot`];
 
             return (
               <div
                 key={meal.meal_type}
                 className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between transition-all hover:border-slate-300"
               >
-                {/* Meal Card Top Header */}
+                {/* Card Top Header */}
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/60">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl sm:text-3xl">{MEAL_ICONS[meal.meal_type.toLowerCase()] || '🍱'}</span>
+                    <span className="text-2xl sm:text-3xl">{STORE_CATEGORY_ICONS[meal.meal_type.toLowerCase()] || '🏬'}</span>
                     <div>
                       <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight flex items-center gap-2">
-                        <span>{capitalizedMeal}</span>
+                        <span>{displayName}</span>
                       </h3>
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                        Pre Order &amp; Same Day Slots
+                        Store Opening &amp; Closing Schedule
                       </span>
                     </div>
                   </div>
@@ -580,7 +547,7 @@ export default function MealTimings() {
                         : 'bg-slate-200 text-slate-600'
                     }`}
                   >
-                    {meal.is_full_day ? '⚡ 24/7 Always Open' : isRunningNow ? '🟢 Serving Now' : isUpcoming ? '⏳ Upcoming Slot' : '🚫 Unavailable'}
+                    {meal.is_full_day ? '⚡ 24/7 Always Open' : isRunningNow ? '🟢 Store Open Now' : isUpcoming ? '⏳ Upcoming Slot' : '🚫 Store Closed'}
                   </span>
                 </div>
 
@@ -630,34 +597,32 @@ export default function MealTimings() {
                     </label>
                   </div>
 
-                  {/* Pre Order Slot (Slot 1) Block */}
+                  {/* Single Slot: Store Opening & Closing Hours */}
                   <div
                     className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-                      slot1.is_active
+                      slot.is_active
                         ? 'bg-emerald-50/30 border-emerald-200 shadow-xs'
                         : 'bg-slate-50/80 border-slate-200 opacity-70'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/80 mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
-                          1
-                        </span>
-                        <h4 className="font-extrabold text-sm text-slate-900">Pre Order Slot</h4>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${status1.color}`}>
-                          {status1.label}
+                        <Clock className="w-4 h-4 text-emerald-600" />
+                        <h4 className="font-extrabold text-sm text-slate-900">Store Operating Hours</h4>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${status.color}`}>
+                          {status.label}
                         </span>
                       </div>
 
                       {/* Active / Inactive Toggle Switch */}
                       <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <span className={`text-xs font-bold ${slot1.is_active ? 'text-emerald-700' : 'text-slate-400'}`}>
-                          {slot1.is_active ? 'Active' : 'Inactive'}
+                        <span className={`text-xs font-bold ${slot.is_active ? 'text-emerald-700' : 'text-slate-400'}`}>
+                          {slot.is_active ? 'Store Open' : 'Store Closed'}
                         </span>
                         <input
                           type="checkbox"
-                          checked={Boolean(slot1.is_active)}
-                          onChange={(e) => handleSlotChange(mealIdx, 1, 'is_active', e.target.checked)}
+                          checked={Boolean(slot.is_active)}
+                          onChange={(e) => handleSlotChange(mealIdx, 'is_active', e.target.checked)}
                           className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                         />
                       </label>
@@ -666,15 +631,15 @@ export default function MealTimings() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Start Date &amp; Time (IST)
+                          Store Opening Time (IST)
                         </label>
                         <input
                           type="datetime-local"
-                          disabled={!slot1.is_active}
-                          value={formatForInput(slot1.start_datetime)}
-                          onChange={(e) => handleSlotChange(mealIdx, 1, 'start_datetime', e.target.value)}
+                          disabled={!slot.is_active}
+                          value={formatForInput(slot.start_datetime)}
+                          onChange={(e) => handleSlotChange(mealIdx, 'start_datetime', e.target.value)}
                           className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold outline-none transition ${
-                            !slot1.is_active
+                            !slot.is_active
                               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                               : 'bg-white text-slate-900 border-slate-300 focus:ring-2 focus:ring-emerald-500'
                           }`}
@@ -683,15 +648,15 @@ export default function MealTimings() {
 
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          End Date &amp; Time (IST)
+                          Store Closing Time (IST)
                         </label>
                         <input
                           type="datetime-local"
-                          disabled={!slot1.is_active}
-                          value={formatForInput(slot1.end_datetime)}
-                          onChange={(e) => handleSlotChange(mealIdx, 1, 'end_datetime', e.target.value)}
+                          disabled={!slot.is_active}
+                          value={formatForInput(slot.end_datetime)}
+                          onChange={(e) => handleSlotChange(mealIdx, 'end_datetime', e.target.value)}
                           className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold outline-none transition ${
-                            !slot1.is_active
+                            !slot.is_active
                               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                               : 'bg-white text-slate-900 border-slate-300 focus:ring-2 focus:ring-emerald-500'
                           }`}
@@ -699,107 +664,34 @@ export default function MealTimings() {
                       </div>
                     </div>
 
-                    {errSlot1 && (
+                    <p className="text-[11px] text-slate-400 font-medium mt-2.5">
+                      This timing applies to both pre-orders and same-day orders. Customers can place orders during these hours.
+                    </p>
+
+                    {errSlot && (
                       <p className="text-xs text-red-600 font-bold mt-2 flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5" />
-                        <span>{errSlot1}</span>
+                        <span>{errSlot}</span>
                       </p>
                     )}
                   </div>
 
-                  {/* Same day Slot (Slot 2) Block */}
-                  <div
-                    className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-                      slot2.is_active
-                        ? 'bg-indigo-50/30 border-indigo-200 shadow-xs'
-                        : 'bg-slate-50/80 border-slate-200 opacity-70'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/80 mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center">
-                          2
-                        </span>
-                        <h4 className="font-extrabold text-sm text-slate-900">Same day Slot</h4>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${status2.color}`}>
-                          {status2.label}
-                        </span>
-                      </div>
-
-                      {/* Active / Inactive Toggle Switch */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <span className={`text-xs font-bold ${slot2.is_active ? 'text-indigo-700' : 'text-slate-400'}`}>
-                          {slot2.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(slot2.is_active)}
-                          onChange={(e) => handleSlotChange(mealIdx, 2, 'is_active', e.target.checked)}
-                          className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Start Date &amp; Time (IST)
-                        </label>
-                        <input
-                          type="datetime-local"
-                          disabled={!slot2.is_active}
-                          value={formatForInput(slot2.start_datetime)}
-                          onChange={(e) => handleSlotChange(mealIdx, 2, 'start_datetime', e.target.value)}
-                          className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold outline-none transition ${
-                            !slot2.is_active
-                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                              : 'bg-white text-slate-900 border-slate-300 focus:ring-2 focus:ring-indigo-500'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          End Date &amp; Time (IST)
-                        </label>
-                        <input
-                          type="datetime-local"
-                          disabled={!slot2.is_active}
-                          value={formatForInput(slot2.end_datetime)}
-                          onChange={(e) => handleSlotChange(mealIdx, 2, 'end_datetime', e.target.value)}
-                          className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold outline-none transition ${
-                            !slot2.is_active
-                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                              : 'bg-white text-slate-900 border-slate-300 focus:ring-2 focus:ring-indigo-500'
-                          }`}
-                        />
-                      </div>
-                    </div>
-
-                    {errSlot2 && (
-                      <p className="text-xs text-red-600 font-bold mt-2 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        <span>{errSlot2}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Option to select Date & Time for User App Note (Below Same day Slot) */}
+                  {/* Customer App Note Settings */}
                   <div className="p-4 sm:p-5 rounded-2xl border border-amber-200/90 bg-amber-50/50 space-y-3.5 transition-all">
                     <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-amber-200/80">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-amber-700" />
-                        <h4 className="font-extrabold text-sm text-slate-900">User App Note Settings</h4>
+                        <h4 className="font-extrabold text-sm text-slate-900">Customer App Note Settings</h4>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-full border border-amber-300/60">
-                        User Notice
+                        Customer Notice
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Date &amp; Time for User Note (IST)
+                          Date &amp; Time for Customer Note (IST)
                         </label>
                         <input
                           type="datetime-local"
@@ -808,7 +700,7 @@ export default function MealTimings() {
                           className="w-full px-3 py-2.5 rounded-xl border border-amber-300/80 bg-white text-xs sm:text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
                         />
                         <p className="text-[10px] text-slate-500 font-medium mt-1">
-                          Select custom date &amp; time to display on the User app note.
+                          Optional custom date &amp; time to display on the Customer app notice.
                         </p>
                       </div>
 
@@ -821,9 +713,9 @@ export default function MealTimings() {
                           onChange={(e) => handleMealFieldChange(mealIdx, 'note_prefix', e.target.value)}
                           className="w-full px-3 py-2.5 rounded-xl border border-amber-300/80 bg-white text-xs sm:text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
                         >
-                          <option value="Available from">Available from [Date &amp; Time]</option>
-                          <option value="Serving now until">Serving now until [Date &amp; Time]</option>
-                          <option value="Pre-orders open until">Pre-orders open until [Date &amp; Time]</option>
+                          <option value="Available from">Store open from [Date &amp; Time]</option>
+                          <option value="Serving now until">Store open now until [Date &amp; Time]</option>
+                          <option value="Pre-orders open until">Orders open until [Date &amp; Time]</option>
                           <option value="Orders closing at">Orders closing at [Date &amp; Time]</option>
                           <option value="Custom Note">Custom Announcement Message</option>
                         </select>
@@ -831,7 +723,7 @@ export default function MealTimings() {
                         {meal.note_prefix === 'Custom Note' && (
                           <input
                             type="text"
-                            placeholder="e.g. Pre-order tomorrow's lunch now"
+                            placeholder="e.g. Orders placed today will be delivered between 4 PM - 7 PM"
                             value={meal.custom_note || ''}
                             onChange={(e) => handleMealFieldChange(mealIdx, 'custom_note', e.target.value)}
                             className="w-full mt-2 px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500"
@@ -840,12 +732,12 @@ export default function MealTimings() {
                       </div>
                     </div>
 
-                    {/* Live User App Note Preview */}
+                    {/* Live Customer App Note Preview */}
                     <div className="p-3 bg-white/95 rounded-xl border border-amber-200/90 text-xs shadow-2xs">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-extrabold text-amber-900 flex items-center gap-1.5">
                           <Bell className="w-3.5 h-3.5 text-amber-600" />
-                          <span>User App Note Preview:</span>
+                          <span>Customer App Note Preview:</span>
                         </span>
                         {meal.note_datetime && (
                           <button
@@ -861,7 +753,7 @@ export default function MealTimings() {
                         )}
                       </div>
                       <p className="text-stone-800 font-semibold text-xs leading-relaxed">
-                        {getComputedUserNote(meal, slot1, slot2, isRunningNow, isUpcoming, status1)}
+                        {getComputedUserNote(meal, slot, isRunningNow, isUpcoming)}
                       </p>
                     </div>
                   </div>
@@ -878,12 +770,12 @@ export default function MealTimings() {
                     {isSaving ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Saving {capitalizedMeal}...</span>
+                        <span>Saving {displayName}...</span>
                       </>
                     ) : (
                       <>
                         <Save className="w-4 h-4" />
-                        <span>Save {capitalizedMeal} Timings</span>
+                        <span>Save {displayName} Schedule</span>
                       </>
                     )}
                   </button>

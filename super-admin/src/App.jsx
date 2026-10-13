@@ -27,13 +27,13 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard':
         return { 
-          title: 'Le Safran Foods Overview', 
+          title: 'Matoshree Kirana Overview', 
           subtitle: 'Live operational health, revenue metrics & platform quick governance' 
         };
       case 'canteen_control':
         return { 
           title: 'Subscription & Access Control', 
-          subtitle: 'Manage Le Safran Foods plan, trial extension, cascading suspension & panel switches' 
+          subtitle: 'Manage Matoshree Kirana plan, trial extension, cascading suspension & panel switches' 
         };
       case 'plans':
         return { 
@@ -43,27 +43,27 @@ export default function App() {
       case 'orders':
         return { 
           title: 'Orders & Sales Database', 
-          subtitle: 'Inspect live meal tokens, order status history, dish details, and revenue flow' 
+          subtitle: 'Inspect live order tokens, order status history, item details, and revenue flow' 
         };
       case 'students':
         return { 
           title: 'Registered Users Database', 
-          subtitle: 'Inspect verified campus user accounts, roll numbers, and total spending' 
+          subtitle: 'Inspect verified user accounts, details, and total spending' 
         };
       case 'menu':
         return { 
-          title: 'Canteen Menu Catalog', 
-          subtitle: 'View breakfast, lunch, snacks, and dinner dishes available for booking' 
+          title: 'Store Products & Catalog', 
+          subtitle: 'View grocery items, snacks, dairy, and daily essentials available for booking' 
         };
       case 'inventory':
         return { 
-          title: 'Kitchen Inventory & Ingredients', 
+          title: 'Store Inventory & Stock', 
           subtitle: 'Inspect real-time stock levels, units, and automated low-stock warnings' 
         };
       case 'staff':
         return { 
           title: 'Staff & Admin Accounts', 
-          subtitle: 'Inspect canteen admin managers and kitchen staff operator accounts' 
+          subtitle: 'Inspect store admin managers and staff operator accounts' 
         };
       case 'audit':
         return { 
@@ -77,8 +77,8 @@ export default function App() {
         };
       default:
         return { 
-          title: 'Le Safran Foods Super-Admin Console', 
-          subtitle: 'Dedicated restaurant management' 
+          title: 'Matoshree Kirana Super-Admin Console', 
+          subtitle: 'Dedicated kirana store management' 
         };
     }
   };

@@ -166,8 +166,8 @@ export default function SubscriptionModal({ isOpen, onClose, onSuccess }) {
         key: key_id,
         amount: amount,
         currency: 'INR',
-        name: 'Mess Management System',
-        description: `Canteen Application Subscription - ${plan?.name || 'Plan Renewal'}`,
+        name: 'Matoshree Kirana',
+        description: `Store Application Subscription - ${plan?.name || 'Plan Renewal'}`,
         image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=200&q=80',
         order_id: dev_razorpay_order_id,
         webview_intent: true,
@@ -194,8 +194,8 @@ export default function SubscriptionModal({ isOpen, onClose, onSuccess }) {
           }
         },
         prefill: {
-          name: 'Canteen Administrator',
-          email: 'contact@cafedcruze.com',
+          name: 'Store Administrator',
+          email: 'contact@matoshree-kirana.mealbook.in',
         },
         theme: {
           color: '#F97316',
@@ -237,7 +237,7 @@ export default function SubscriptionModal({ isOpen, onClose, onSuccess }) {
             <span>Super-Admin Subscription Billing</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Renew Canteen App Subscription
+            Renew Store App Subscription
           </h2>
           <p className="text-xs sm:text-sm text-slate-400">
             Select a plan to extend or reactivate application access. Prices are managed dynamically by the Super-Admin.
@@ -336,7 +336,7 @@ export default function SubscriptionModal({ isOpen, onClose, onSuccess }) {
             <span>Connected to Super-Admin Plan Pricing</span>
           </div>
           <p>
-            Subscription renewals immediately synchronize with Super-Admin organization records and automatically reactivate canteen operations.
+            Subscription renewals immediately synchronize with Super-Admin organization records and automatically reactivate store operations.
           </p>
         </div>
 

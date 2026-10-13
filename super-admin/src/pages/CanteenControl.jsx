@@ -222,7 +222,7 @@ export default function CanteenControl() {
     return (
       <div className="p-6 sm:p-10 flex flex-col items-center justify-center min-h-[60vh] space-y-3">
         <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-        <p className="text-xs font-semibold text-slate-400">Loading Le Safran Foods configurations...</p>
+        <p className="text-xs font-semibold text-slate-400">Loading Matoshree Kirana configurations...</p>
       </div>
     );
   }
@@ -234,7 +234,7 @@ export default function CanteenControl() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight">
-            Le Safran Foods Control & Subscription
+            Matoshree Kirana Control & Subscription
           </h1>
           <p className="text-xs text-slate-400 font-medium">
             Control master cascading suspension, trial periods, subscription plan billing, and panel switches
@@ -271,7 +271,7 @@ export default function CanteenControl() {
         <div className="bg-[#0f172a] rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4">
           <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold font-display text-base">
-              DY
+              MK
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-white">{canteen?.name}</h3>
@@ -282,7 +282,7 @@ export default function CanteenControl() {
           <div className="space-y-3 text-xs">
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-500 block">Contact Email</span>
-              <span className="text-slate-200 font-semibold">{canteen?.contact_email || 'contact@cafedcruze.com'}</span>
+              <span className="text-slate-200 font-semibold">{canteen?.contact_email || 'contact@matoshree-kirana.mealbook.in'}</span>
             </div>
 
             <div>
@@ -291,8 +291,8 @@ export default function CanteenControl() {
             </div>
 
             <div>
-              <span className="text-[10px] font-bold uppercase text-slate-500 block">Campus Location</span>
-              <span className="text-slate-300 leading-relaxed block">{canteen?.address || 'Le Safran Foods, Campus Food Court'}</span>
+              <span className="text-[10px] font-bold uppercase text-slate-500 block">Store Location</span>
+              <span className="text-slate-300 leading-relaxed block">{canteen?.address || 'Matoshree Kirana Store, Main Road'}</span>
             </div>
 
             <div>
@@ -316,7 +316,7 @@ export default function CanteenControl() {
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-white">Subscription & Plan Tier</h3>
-                  <p className="text-[11px] text-slate-400">Current package configured for Le Safran Foods</p>
+                  <p className="text-[11px] text-slate-400">Current package configured for Matoshree Kirana</p>
                 </div>
               </div>
 
@@ -517,7 +517,7 @@ export default function CanteenControl() {
       <Modal
         isOpen={extendTrialModalOpen}
         onClose={() => setExtendTrialModalOpen(false)}
-        title="Extend Free Trial Days: Le Safran Foods"
+        title="Extend Free Trial Days: Matoshree Kirana"
       >
         <form onSubmit={handleExtendTrialSubmit} className="space-y-4 text-xs">
           <div>
@@ -567,7 +567,7 @@ export default function CanteenControl() {
       <Modal
         isOpen={changeSubModalOpen}
         onClose={() => setChangeSubModalOpen(false)}
-        title="Update Subscription: Le Safran Foods"
+        title="Update Subscription: Matoshree Kirana"
       >
         <form onSubmit={handleUpdateSubscriptionSubmit} className="space-y-4 text-xs">
           <div>
@@ -654,7 +654,7 @@ export default function CanteenControl() {
       <Modal
         isOpen={suspendConfirmModalOpen}
         onClose={() => setSuspendConfirmModalOpen(false)}
-        title="Confirm Cascading Suspension: Le Safran Foods"
+        title="Confirm Cascading Suspension: Matoshree Kirana"
       >
         <div className="space-y-4 text-xs">
           <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 text-red-300">
@@ -662,7 +662,7 @@ export default function CanteenControl() {
             <div>
               <p className="font-bold text-white text-sm">Cascading Suspension Notice</p>
               <p className="mt-1 leading-relaxed text-red-300">
-                Suspending Le Safran Foods will instantly lock access for <strong>BOTH</strong> the canteen Admin kitchen panel and the User meal booking app until unsuspended.
+                Suspending Matoshree Kirana will instantly lock access for <strong>BOTH</strong> the store Admin panel and the User shopping app until unsuspended.
               </p>
             </div>
           </div>
@@ -691,13 +691,13 @@ export default function CanteenControl() {
       <Modal
         isOpen={manualDaysModalOpen}
         onClose={() => setManualDaysModalOpen(false)}
-        title="Add Days Manually: Le Safran Foods"
+        title="Add Days Manually: Matoshree Kirana"
       >
         <form onSubmit={handleAddManualDaysSubmit} className="space-y-4 text-xs">
           <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 flex items-start gap-2.5">
             <CalendarPlus className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
             <p className="font-semibold leading-relaxed">
-              Add extra validity days to the canteen's active subscription directly without changing or selecting any pre-defined plan tier.
+              Add extra validity days to the store's active subscription directly without changing or selecting any pre-defined plan tier.
             </p>
           </div>
 
@@ -749,7 +749,7 @@ export default function CanteenControl() {
       <Modal
         isOpen={deleteSubModalOpen}
         onClose={() => setDeleteSubModalOpen(false)}
-        title="Delete All Subscription Plans: Le Safran Foods Project"
+        title="Delete All Subscription Plans: Matoshree Kirana Project"
       >
         <form onSubmit={handleDeleteSubscriptionSubmit} className="space-y-4 text-xs">
           <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 text-red-300">
@@ -757,7 +757,7 @@ export default function CanteenControl() {
             <div>
               <p className="font-bold text-white text-sm">Delete Project Subscription Plan</p>
               <p className="mt-1 leading-relaxed text-red-300">
-                This will delete and remove all active subscription plans from the Le Safran Foods project. The project's subscription status will instantly be reset to <strong>Expired</strong>, removing all active validity dates.
+                This will delete and remove all active subscription plans from the Matoshree Kirana project. The project's subscription status will instantly be reset to <strong>Expired</strong>, removing all active validity dates.
               </p>
             </div>
           </div>

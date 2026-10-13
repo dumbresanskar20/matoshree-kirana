@@ -33,15 +33,15 @@ export default function Header({ onOpenOrders }) {
           >
             <img
               src={CAFE_D_CRUZE_LOGO}
-              alt="Le Safran Foods Logo"
+              alt="Matoshree Kirana Logo"
               className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl object-contain bg-white p-0.5 shadow-warm border border-amber-200 hover:rotate-6 transition-transform shrink-0"
             />
             <div className="min-w-0">
               <span className="font-display font-extrabold text-lg sm:text-2xl text-brand-dark tracking-tight leading-none block whitespace-nowrap truncate">
-                Le Safran <span className="text-brand-orange">Foods</span>
+                Matoshree <span className="text-brand-orange">Kirana</span>
               </span>
               <span className="text-[10px] sm:text-xs font-semibold text-stone-500 tracking-wider uppercase hidden sm:block whitespace-nowrap">
-                Fresh & Delicious Daily
+                Your Daily Needs Our Priority
               </span>
             </div>
           </div>

@@ -27,7 +27,7 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
 
   // Form states
   const [customerName, setCustomerName] = useState('');
-  const [selectedMeal, setSelectedMeal] = useState('lunch');
+  const [selectedMeal, setSelectedMeal] = useState('');
   const [cart, setCart] = useState({}); // { [itemId]: { item, quantity } }
   const [paymentMethod, setPaymentMethod] = useState('counter_cash'); // 'counter_cash' | 'counter_upi' | 'other'
   const [itemSearch, setItemSearch] = useState('');
@@ -43,10 +43,12 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
 
   const availableMealTypes = React.useMemo(() => {
     if (Array.isArray(mealWindows) && mealWindows.length > 0) {
-      const types = mealWindows.map((w) => (w.meal_type || '').toLowerCase().trim()).filter(Boolean);
+      const types = mealWindows
+        .map((w) => (w.meal_type || '').toLowerCase().trim())
+        .filter((t) => Boolean(t) && !['breakfast', 'lunch', 'snacks', 'dinner'].includes(t));
       return Array.from(new Set(types));
     }
-    return ['breakfast', 'lunch', 'snacks', 'dinner'];
+    return [];
   }, [mealWindows]);
 
   // Success state after creation
@@ -73,14 +75,16 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
       const res = await api.get('/menu/windows');
       if (res.data.success && Array.isArray(res.data.windows)) {
         setMealWindows(res.data.windows);
-        // Default to first open meal window, or fallback to 'lunch'
-        const openWindow = res.data.windows.find((w) => w.is_active && w.is_currently_open);
+        const validWindows = res.data.windows.filter(
+          (w) => !['breakfast', 'lunch', 'snacks', 'dinner'].includes((w.meal_type || '').toLowerCase().trim())
+        );
+        const openWindow = validWindows.find((w) => w.is_active && w.is_currently_open) || validWindows[0];
         if (openWindow) {
           setSelectedMeal(openWindow.meal_type.toLowerCase());
         }
       }
     } catch (err) {
-      console.warn('Failed to load meal windows:', err);
+      console.warn('Failed to load store categories:', err);
     }
   };
 
@@ -314,7 +318,7 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
             {/* Summary Breakdown */}
             <div className="max-w-sm mx-auto bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left text-xs space-y-2">
               <div className="font-bold text-slate-700 pb-1.5 border-b border-slate-200 flex justify-between">
-                <span>Items Ordered:</span>
+                <span>Products Ordered:</span>
                 <span>Qty × Price</span>
               </div>
               <div className="space-y-1">
@@ -415,11 +419,11 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
               </div>
             </div>
 
-            {/* Meal Type Selection */}
+            {/* Category Selection */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700">
-                  Meal Category <span className="text-rose-500">*</span>
+                  Store Category <span className="text-rose-500">*</span>
                 </label>
                 {discountStatus.is_discount_active && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full animate-pulse">
@@ -466,18 +470,18 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
               </div>
             </div>
 
-            {/* Menu Item Picker */}
+            {/* Product Picker */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700">
-                  Select Items from Active Menu ({menuItems.length})
+                  Select Products from Store Catalog ({menuItems.length})
                 </label>
-                {/* Search in Menu */}
+                {/* Search in Catalog */}
                 <div className="relative w-44">
                   <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Filter item..."
+                    placeholder="Filter product..."
                     value={itemSearch}
                     onChange={(e) => setItemSearch(e.target.value)}
                     className="w-full pl-8 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-orange-500"
@@ -487,11 +491,11 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
 
               {loadingMenu ? (
                 <div className="p-8 text-center text-xs text-slate-400 font-semibold animate-pulse">
-                  Loading menu items for {selectedMeal}...
+                  Loading products for {selectedMeal}...
                 </div>
               ) : filteredMenuItems.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  No active items available for this meal category.
+                  No active products available for this category.
                 </div>
               ) : (
                 <div className="max-h-52 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100">
@@ -512,7 +516,7 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
                               <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
                                 <span>{item.name}</span>
                               </h4>
-                              <p className="text-[10px] text-amber-800 font-semibold">Select Quantity / Portion:</p>
+                              <p className="text-[10px] text-amber-800 font-semibold">Select Quantity / Pack Size:</p>
                             </div>
                             {isOutOfStock && (
                               <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded">

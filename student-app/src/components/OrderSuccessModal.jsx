@@ -70,7 +70,7 @@ export default function OrderSuccessModal({ tokenNumber, order, onClose }) {
         </div>
 
         <h2 className="text-xl sm:text-2xl font-extrabold font-display text-brand-dark">Payment Confirmed!</h2>
-        <p className="text-xs text-stone-500 mt-1">Show this token or QR code at the canteen counter</p>
+        <p className="text-xs text-stone-500 mt-1">Show this token or QR code at the Matoshree Kirana counter</p>
 
         {/* Prominent Token & QR Card */}
         <div className="my-4 p-4 sm:p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl border-2 border-dashed border-amber-300 shadow-inner flex flex-col items-center space-y-2.5">
@@ -111,7 +111,7 @@ export default function OrderSuccessModal({ tokenNumber, order, onClose }) {
                 <span>🚚 OUT FOR DELIVERY</span>
               </span>
               <p className="text-[11px] font-bold text-blue-900 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 text-center w-full">
-                Your meal is on the way to your delivery address!
+                Your order is on the way to your delivery address!
               </p>
             </div>
           ) : currentStatus === 'ready' ? (
@@ -121,13 +121,13 @@ export default function OrderSuccessModal({ tokenNumber, order, onClose }) {
                 <span>🎉 READY FOR PICKUP</span>
               </span>
               <p className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 text-center w-full">
-                Your food is prepared and ready!
+                Your items are packed and ready!
               </p>
             </div>
           ) : (
             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 px-3.5 py-1.5 rounded-full border border-amber-200">
               <Clock className="w-3.5 h-3.5 text-brand-orange animate-spin" style={{ animationDuration: '4s' }} />
-              <span>Preparing in Kitchen</span>
+              <span>Packing & Preparing</span>
             </span>
           )}
         </div>
@@ -221,7 +221,7 @@ export default function OrderSuccessModal({ tokenNumber, order, onClose }) {
           className="w-full py-3 bg-brand-dark text-white font-bold rounded-2xl text-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-warm"
         >
           <Utensils className="w-4 h-4" />
-          <span>Done & Back to Menu</span>
+          <span>Done & Back to Store</span>
         </button>
 
       </div>

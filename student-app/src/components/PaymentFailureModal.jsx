@@ -45,7 +45,7 @@ export default function PaymentFailureModal({
           onOpenOrderHistory();
         }
       } else {
-        setRecoverError(res.data?.message || 'Payment not yet confirmed on Razorpay. Please check with canteen staff.');
+        setRecoverError(res.data?.message || 'Payment not yet confirmed on Razorpay. Please check with Matoshree Kirana store staff.');
       }
     } catch (err) {
       setRecoverError(err.response?.data?.message || 'Could not verify payment yet.');
@@ -99,7 +99,7 @@ export default function PaymentFailureModal({
               <ShieldAlert className="w-9 h-9 sm:w-11 sm:h-11 text-brand-orange animate-pulse" />
             </div>
             <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm border border-amber-200">
-              <img src={CAFE_D_CRUZE_LOGO} alt="Le Safran Foods" className="w-5 h-5 object-contain" />
+              <img src={CAFE_D_CRUZE_LOGO} alt="Matoshree Kirana" className="w-5 h-5 object-contain" />
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export default function PaymentFailureModal({
                 <p className="text-stone-800 font-medium">
                   If your payment was successful or money got debited but the token was not generated,{' '}
                   <span className="font-extrabold text-amber-900 underline decoration-amber-400 decoration-2">
-                    kindly contact the mess/canteen to get your token.
+                    kindly contact Matoshree Kirana to get your token.
                   </span>
                 </p>
               </div>
@@ -145,7 +145,7 @@ export default function PaymentFailureModal({
                   type="button"
                   onClick={handleCopyDetails}
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-orange hover:text-amber-700 bg-white px-2 py-0.5 rounded-lg border border-amber-200 hover:border-amber-300 shadow-2xs transition-all cursor-pointer"
-                  title="Copy details to share with canteen staff"
+                  title="Copy details to share with store staff"
                 >
                   {copied ? (
                     <>
@@ -195,7 +195,7 @@ export default function PaymentFailureModal({
             <HelpCircle className="w-4 h-4 text-brand-orange shrink-0 mt-0.5" />
             <div className="text-stone-600 space-y-0.5 text-[11px] sm:text-xs">
               <p className="font-bold text-stone-800">What to do next:</p>
-              <p>1. Show your payment SMS/UPI transaction ID at the mess counter.</p>
+              <p>1. Show your payment SMS/UPI transaction ID at the store counter.</p>
               <p>2. Or tap <b>Check Order History</b> below to see if the token was recorded.</p>
             </div>
           </div>

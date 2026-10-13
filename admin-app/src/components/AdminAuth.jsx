@@ -120,7 +120,7 @@ export default function AdminAuth() {
         <div className="text-center mb-6">
           <img
             src={CAFE_D_CRUZE_LOGO}
-            alt="Le Safran Foods Logo"
+            alt="Matoshree Kirana Logo"
             className="w-16 h-16 rounded-2xl object-contain bg-white p-1.5 mx-auto mb-3 shadow-md border border-slate-200"
           />
 
@@ -128,16 +128,16 @@ export default function AdminAuth() {
             {setupToken
               ? 'Set Staff Password'
               : isRegisterMode
-              ? 'Register Le Safran Foods Account'
-              : 'Le Safran Foods Login'}
+              ? 'Register Matoshree Kirana Account'
+              : 'Matoshree Kirana Store Login'}
           </h2>
 
           <p className="text-xs text-slate-500 font-semibold mt-1">
             {setupToken
               ? 'Set your password to activate your staff account'
               : isRegisterMode
-              ? 'Create credentials to manage the canteen operations'
-              : 'Authorized canteen personnel only'}
+              ? 'Create credentials to manage the store operations'
+              : 'Authorized store personnel only'}
           </p>
         </div>
 
@@ -301,8 +301,8 @@ export default function AdminAuth() {
                   onChange={(e) => setRegRole(e.target.value)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-bold text-slate-800 bg-white"
                 >
-                  <option value="admin">Canteen Admin (Orders, Menu, Inventory & Timings)</option>
-                  <option value="staff">Kitchen Staff (Kitchen Screen & Orders)</option>
+                  <option value="admin">Store Admin (Orders, Catalog, Inventory & Timings)</option>
+                  <option value="staff">Store Staff (Billing Screen & Orders)</option>
                 </select>
               </div>
             </div>
@@ -326,7 +326,7 @@ export default function AdminAuth() {
                 <input
                   type="text"
                   required
-                  placeholder="admin@mess.com or staff_user"
+                  placeholder="admin@kirana.com or staff_user"
                   value={usernameOrEmail}
                   onChange={(e) => setUsernameOrEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-medium"
@@ -362,7 +362,7 @@ export default function AdminAuth() {
               disabled={loading}
               className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              {loading ? 'Authenticating...' : 'Sign In to Canteen Control'}
+              {loading ? 'Authenticating...' : 'Sign In to Store Control'}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

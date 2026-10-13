@@ -120,11 +120,11 @@ export default function OrderDetailModal({ order, onClose }) {
           <div className="flex items-center justify-center gap-2 mb-1.5">
             <img
               src={CAFE_D_CRUZE_LOGO}
-              alt="Le Safran Foods Logo"
+              alt="Matoshree Kirana Logo"
               className="w-7 h-7 rounded-xl object-contain bg-white p-0.5 shadow-sm border border-amber-200"
             />
             <span className="font-display font-extrabold text-sm text-brand-dark tracking-tight leading-none">
-              Le Safran <span className="text-brand-orange">Foods</span>
+              Matoshree <span className="text-brand-orange">Kirana</span>
             </span>
           </div>
           <div className="flex items-center justify-center gap-2">

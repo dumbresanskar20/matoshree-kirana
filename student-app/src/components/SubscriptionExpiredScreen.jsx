@@ -57,12 +57,12 @@ export default function SubscriptionExpiredScreen({ onRetry }) {
           <div className="p-3.5 bg-amber-500/15 border border-amber-500/30 rounded-2xl">
             <p className="text-sm sm:text-base font-bold text-amber-300 flex items-center justify-center gap-2">
               <PhoneCall className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>Kindly contact to the Canteen(Mess).</span>
+              <span>Kindly contact Matoshree Kirana.</span>
             </p>
           </div>
 
           <p className="text-xs sm:text-sm text-stone-400 max-w-md mx-auto leading-relaxed font-medium">
-            Online meal token ordering, menu browsing, and counter operations are temporarily paused until canteen administration reactivates the service.
+            Online grocery ordering, catalog browsing, and counter operations are temporarily paused until store administration reactivates the service.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export default function SubscriptionExpiredScreen({ onRetry }) {
         </div>
 
         <div className="pt-1 text-[11px] text-stone-500">
-          MealBook • Digital Canteen Management System
+          MealBook • Digital Kirana Management System
         </div>
       </div>
     </div>

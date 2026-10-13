@@ -343,8 +343,8 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
         key: activeKey,
         amount: amount,
         currency: currency || 'INR',
-        name: 'Campus Mess Canteen',
-        description: `${selectedMealType.toUpperCase()} Meal Order Token`,
+        name: 'Matoshree Kirana',
+        description: `${selectedMealType.toUpperCase()} Order Token`,
         order_id: razorpay_order_id.startsWith('order_mock_') ? undefined : razorpay_order_id,
         webview_intent: true,
         handler: async function (response) {
@@ -404,7 +404,7 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
             const failReason =
               verifyErr.response?.data?.message ||
               verifyErr.message ||
-              'Payment received! We are confirming your token with the canteen...';
+              'Payment received! We are confirming your token with Matoshree Kirana...';
 
             setErrorMessage(
               'Your payment was successful on Razorpay! If your token number does not appear immediately, check "My Orders" in the top bar.'
@@ -626,7 +626,7 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
                 }}
                 className="inline-flex items-center gap-1 text-[11px] font-extrabold text-brand-orange hover:text-amber-800 underline underline-offset-2 cursor-pointer pt-0.5"
               >
-                <span>Money debited? Don't worry — tap here for canteen instructions</span>
+                <span>Money debited? Don't worry — tap here for store assistance</span>
               </button>
             </div>
           )}
@@ -634,18 +634,18 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
           {cartItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center py-12 space-y-3">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-4xl sm:text-5xl shadow-inner animate-bounce">
-                🍽️
+                🛍️
               </div>
-              <h3 className="font-display font-bold text-lg sm:text-xl text-stone-800">Your tray is empty — let's fix that!</h3>
+              <h3 className="font-display font-bold text-lg sm:text-xl text-stone-800">Your cart is empty — let's fix that!</h3>
               <p className="text-xs sm:text-sm text-stone-500 max-w-xs mx-auto leading-relaxed">
-                Explore today's active meal menu items below and tap 'Add to Tray'.
+                Explore today's grocery & essentials catalog below and tap 'Add to Cart'.
               </p>
               <button
                 onClick={handleBackToMenu}
                 className="mt-2 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-brand-orange to-amber-600 hover:from-amber-600 hover:to-brand-orange text-white font-bold text-xs shadow-warm hover:scale-105 active:scale-95 transition-all cursor-pointer"
               >
                 <Utensils className="w-3.5 h-3.5" />
-                <span>Browse Menu Items</span>
+                <span>Browse Store Items</span>
               </button>
             </div>
           ) : (
@@ -771,7 +771,7 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
               )}
 
               <div className="flex justify-between">
-                <span>Taxes & Canteen Handling</span>
+                <span>Taxes & Handling</span>
                 <span className="text-emerald-600 font-bold">FREE</span>
               </div>
 

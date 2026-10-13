@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutGrid, UtensilsCrossed, Clock, Users, LogOut, History, Menu, X, Package, Star, Percent, BarChart3, KeyRound } from 'lucide-react';
+import { LayoutGrid, ShoppingBag, Clock, Users, LogOut, History, Menu, X, Package, Star, Percent, BarChart3, KeyRound } from 'lucide-react';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import CAFE_D_CRUZE_LOGO from '../assets/logo';
 import AlertControls from './AlertControls';
@@ -14,10 +14,10 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenChangePassword 
       { id: 'kitchen', label: 'Order Fulfillment', icon: LayoutGrid, highlight: true },
       { id: 'history', label: 'Order History', icon: History },
       { id: 'reviews', label: 'Ratings & Reviews', icon: Star },
-      { id: 'menu', label: 'Menu Management', icon: UtensilsCrossed },
-      { id: 'menu-report', label: 'Menu Report', icon: BarChart3 },
+      { id: 'menu', label: 'Product Catalog', icon: ShoppingBag },
+      { id: 'menu-report', label: 'Product Report', icon: BarChart3 },
       { id: 'inventory', label: 'Total Inventory', icon: Package },
-      { id: 'timings', label: 'Meal Timings', icon: Clock },
+      { id: 'timings', label: 'Store Timings', icon: Clock },
       { id: 'discounts', label: 'Discount Rules', icon: Percent },
       { id: 'staff', label: 'Manage Staff', icon: Users }
     );
@@ -26,16 +26,16 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenChangePassword 
       { id: 'kitchen', label: 'Order Fulfillment', icon: LayoutGrid, highlight: true },
       { id: 'history', label: 'Order History', icon: History },
       { id: 'reviews', label: 'Ratings & Reviews', icon: Star },
-      { id: 'menu', label: 'Menu Management', icon: UtensilsCrossed },
-      { id: 'menu-report', label: 'Menu Report', icon: BarChart3 },
+      { id: 'menu', label: 'Product Catalog', icon: ShoppingBag },
+      { id: 'menu-report', label: 'Product Report', icon: BarChart3 },
       { id: 'inventory', label: 'Total Inventory', icon: Package },
-      { id: 'timings', label: 'Meal Timings', icon: Clock },
+      { id: 'timings', label: 'Store Timings', icon: Clock },
       { id: 'discounts', label: 'Discount Rules', icon: Percent }
     );
   } else {
     // staff role
     navItems.push(
-      { id: 'kitchen', label: 'Kitchen Screen', icon: LayoutGrid, highlight: true }
+      { id: 'kitchen', label: 'Store Counter', icon: LayoutGrid, highlight: true }
     );
   }
 
@@ -51,15 +51,15 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenChangePassword 
         <div className="flex items-center gap-2.5">
           <img
             src={CAFE_D_CRUZE_LOGO}
-            alt="Le Safran Foods Logo"
+            alt="Matoshree Kirana Logo"
             className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 shadow-sm border border-slate-700"
           />
           <div>
             <h1 className="font-extrabold text-sm text-white tracking-tight leading-none">
-              Le Safran <span className="text-emerald-400">Foods</span>
+              Matoshree <span className="text-emerald-400">Kirana</span>
             </h1>
             <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-              {navItems.find((n) => n.id === activeTab)?.label || 'Kitchen Operations'}
+              {navItems.find((n) => n.id === activeTab)?.label || 'Store Operations'}
             </span>
           </div>
         </div>
@@ -98,14 +98,14 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenChangePassword 
             <div className="flex items-center gap-3">
               <img
                 src={CAFE_D_CRUZE_LOGO}
-                alt="Le Safran Foods Logo"
+                alt="Matoshree Kirana Logo"
                 className="w-10 h-10 rounded-xl object-contain bg-white p-1 shadow-md border border-slate-700/80"
               />
               <div>
                 <h1 className="font-extrabold text-base text-white tracking-tight leading-none">
-                  Le Safran <span className="text-emerald-400">Foods</span>
+                  Matoshree <span className="text-emerald-400">Kirana</span>
                 </h1>
-                <span className="text-[10px] text-slate-400 font-medium">Order Fulfillment & Stocks</span>
+                <span className="text-[10px] text-slate-400 font-medium">Your Daily Needs, Our Priority</span>
               </div>
             </div>
 
@@ -128,7 +128,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenChangePassword 
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-white truncate">{admin?.username || 'Admin User'}</p>
                 <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider block">
-                  {admin?.role === 'super_admin' ? 'Super Admin' : admin?.role === 'admin' ? 'Admin' : 'Kitchen Staff'}
+                  {admin?.role === 'super_admin' ? 'Super Admin' : admin?.role === 'admin' ? 'Store Admin' : 'Store Staff'}
                 </span>
               </div>
             </div>

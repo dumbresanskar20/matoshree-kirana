@@ -99,8 +99,8 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
     admin?.role === 'super_admin'
       ? 'Super Admin'
       : admin?.role === 'admin'
-      ? 'Canteen Admin'
-      : 'Kitchen Staff';
+      ? 'Store Admin'
+      : 'Store Staff';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">

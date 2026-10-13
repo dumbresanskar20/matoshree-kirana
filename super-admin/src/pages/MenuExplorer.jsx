@@ -33,10 +33,10 @@ export default function MenuExplorer() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight flex items-center gap-2.5">
             <Utensils className="w-6 h-6 text-amber-400" />
-            <span>Le Safran Foods Menu Catalog</span>
+            <span>Matoshree Kirana Products & Catalog</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium">
-            Database records of all breakfast, lunch, snacks, and dinner dishes available for booking
+            Database records of all grocery items, snacks, beverages, and daily essentials available for ordering
           </p>
         </div>
 

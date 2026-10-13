@@ -10,9 +10,9 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
 
   const navSections = [
     {
-      title: 'Le Safran Foods Control',
+      title: 'Matoshree Kirana Control',
       items: [
-        { id: 'dashboard', label: 'Canteen Dashboard', icon: LayoutDashboard },
+        { id: 'dashboard', label: 'Store Dashboard', icon: LayoutDashboard },
         { id: 'canteen_control', label: 'Subscription & Access', icon: ShieldAlert },
         { id: 'plans', label: 'Plans & Pricing', icon: CreditCard },
       ],
@@ -57,7 +57,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
               </div>
               <div>
                 <h1 className="font-extrabold text-base text-white tracking-tight leading-none font-display">
-                  Le Safran Foods <span className="text-indigo-400">Master</span>
+                  Matoshree Kirana <span className="text-indigo-400">Master</span>
                 </h1>
                 <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mt-0.5">
                   Super-Admin Console

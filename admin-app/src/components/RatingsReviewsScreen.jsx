@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, MessageSquare, Search, Filter, RefreshCw, ThumbsUp, UtensilsCrossed, Calendar, User, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Star, MessageSquare, Search, Filter, RefreshCw, ThumbsUp, ShoppingBag, Calendar, User, CheckCircle2, ChevronRight } from 'lucide-react';
 import api from '../services/api';
 
 export default function RatingsReviewsScreen() {
@@ -49,20 +49,26 @@ export default function RatingsReviewsScreen() {
   const resolveFoodImage = (url) => {
     if (!url) return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    let base = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'https://matoshree-api.mealbook.in';
+    let base = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'https://matoshree-kirana.onrender.com';
     if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
       base = 'https://matoshree-kirana.onrender.com';
     }
     return `${base.replace(/\/+$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  const categories = [
-    { id: 'all', label: 'All Meals', icon: '🍱' },
-    { id: 'breakfast', label: 'Breakfast', icon: '🌅' },
-    { id: 'lunch', label: 'Lunch', icon: '☀️' },
-    { id: 'snacks', label: 'Snacks', icon: '☕' },
-    { id: 'dinner', label: 'Dinner', icon: '🌙' },
-  ];
+  const categories = React.useMemo(() => {
+    const list = [{ id: 'all', label: 'All Products', icon: '🛒' }];
+    const unique = new Set();
+    mealSummary.forEach((m) => {
+      const cat = (m.meal_type || '').toLowerCase().trim();
+      if (cat && !['breakfast', 'lunch', 'snacks', 'dinner'].includes(cat) && !unique.has(cat)) {
+        unique.add(cat);
+        const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+        list.push({ id: cat, label, icon: '🏷️' });
+      }
+    });
+    return list;
+  }, [mealSummary]);
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-screen-2xl mx-auto">
@@ -78,7 +84,7 @@ export default function RatingsReviewsScreen() {
               <span>Ratings & Reviews</span>
             </h2>
             <p className="text-xs text-slate-500 font-semibold mt-0.5">
-              Meal-wise average customer satisfaction and user reviews
+              Category-wise average customer satisfaction and product feedback
             </p>
           </div>
         </div>
@@ -104,7 +110,7 @@ export default function RatingsReviewsScreen() {
           {/* Total Overall Average */}
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-3xl border border-slate-700 shadow-md space-y-2">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400">
-              Average Canteen Rating
+              Average Store Rating
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-black text-white">
@@ -178,7 +184,7 @@ export default function RatingsReviewsScreen() {
                 activeTab === 'meals' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Meal-wise Breakdown
+              Product Breakdown
             </button>
             <button
               onClick={() => setActiveTab('feed')}
@@ -198,7 +204,7 @@ export default function RatingsReviewsScreen() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search meal by name (e.g. Tea, Upma, Poha, Thali...)"
+            placeholder="Search product by name (e.g. Atta, Rice, Oil, Biscuits, Soap...)"
             className="w-full pl-10 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:bg-white outline-none"
           />
           <button
@@ -213,18 +219,18 @@ export default function RatingsReviewsScreen() {
       {/* Main Content Area */}
       {loading ? (
         <div className="p-16 text-center text-slate-400 font-semibold animate-pulse bg-white rounded-3xl border border-slate-200">
-          Loading meal ratings & analytics...
+          Loading product ratings & analytics...
         </div>
       ) : activeTab === 'meals' ? (
-        /* View 1: Meal-Wise Performance Grid */
+        /* View 1: Product-Wise Performance Grid */
         mealSummary.length === 0 ? (
           <div className="p-16 text-center space-y-3 bg-white rounded-3xl border border-slate-200">
             <div className="w-14 h-14 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto">
-              🍱
+              🛒
             </div>
-            <h4 className="text-slate-800 font-bold text-base">No meals found</h4>
+            <h4 className="text-slate-800 font-bold text-base">No products found</h4>
             <p className="text-slate-400 text-xs max-w-sm mx-auto">
-              Try selecting a different meal category or resetting the search keyword.
+              Try selecting a different product category or resetting the search keyword.
             </p>
           </div>
         ) : (
@@ -330,7 +336,7 @@ export default function RatingsReviewsScreen() {
           </div>
         )
       ) : (
-        /* View 2: Recent Student Reviews Feed */
+        /* View 2: Recent Customer Reviews Feed */
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
           {recentReviews.length === 0 ? (
             <div className="p-16 text-center space-y-3">
@@ -348,12 +354,12 @@ export default function RatingsReviewsScreen() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
-                      {rev.student_name ? rev.student_name.charAt(0).toUpperCase() : 'S'}
+                      {rev.student_name ? rev.student_name.charAt(0).toUpperCase() : 'C'}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <h5 className="font-extrabold text-sm text-slate-900">
-                          {rev.student_name || 'User'}
+                          {rev.student_name || 'Customer'}
                         </h5>
                         {rev.token_number && (
                           <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
@@ -386,7 +392,7 @@ export default function RatingsReviewsScreen() {
                 {/* Review Item & Comment */}
                 <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100 space-y-1 mt-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                    <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" />
+                    <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
                     <span>{rev.menu_item_name}</span>
                   </div>
                   {rev.review_text ? (
