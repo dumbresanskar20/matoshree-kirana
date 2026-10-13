@@ -115,9 +115,11 @@ const resolveDbConfig = () => {
     '';
 
   const enableSsl =
-    cleanEnvStr(process.env.DB_SSL) === 'true' ||
-    cleanEnvStr(process.env.MYSQL_SSL) === 'true' ||
-    Boolean(urlConfig.ssl);
+    cleanEnvStr(process.env.DB_SSL) === 'false' || cleanEnvStr(process.env.MYSQL_SSL) === 'false'
+      ? false
+      : cleanEnvStr(process.env.DB_SSL) === 'true' ||
+        cleanEnvStr(process.env.MYSQL_SSL) === 'true' ||
+        Boolean(urlConfig.ssl);
 
   const ssl = enableSsl ? { rejectUnauthorized: false } : undefined;
 
