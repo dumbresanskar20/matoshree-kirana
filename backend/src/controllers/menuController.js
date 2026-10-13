@@ -147,6 +147,14 @@ const mapMenuItem = (record, req, trackingEnabled = false) => {
     _id: record.id,
     image_url: formatPublicImageUrl(record.image_url, req),
     price: Number(record.price),
+    mrp: record.mrp ? Number(record.mrp) : Number(record.price),
+    category: record.category || record.meal_type,
+    unit: record.unit || 'piece',
+    brand: record.brand || null,
+    barcode: record.barcode || null,
+    stock_quantity: Number(record.stock_quantity !== undefined ? record.stock_quantity : availableQty),
+    in_stock: isInStock,
+    discount_percentage: Number(record.discount_percentage || 0),
     has_variants: hasVariants,
     variants: Array.isArray(parsedVariants) ? parsedVariants : [],
     available_quantity: availableQty,
@@ -497,13 +505,33 @@ const getMenuItems = async (req, res) => {
 // Create a new menu item (Admin)
 const createMenuItem = async (req, res) => {
   try {
-    const { name, image_url, meal_type, price, description, is_active, recipe, has_variants, variants } = req.body;
+    const {
+      name,
+      image_url,
+      meal_type,
+      category,
+      price,
+      mrp,
+      unit,
+      brand,
+      barcode,
+      stock_quantity,
+      discount_percentage,
+      description,
+      is_active,
+      recipe,
+      has_variants,
+      variants,
+    } = req.body;
 
-    if (!name || price === undefined || !meal_type) {
+    const resolvedCategory = (category || meal_type || 'grocery').toString().toLowerCase().trim();
+    const resolvedMealType = (meal_type || category || 'grocery').toString().toLowerCase().trim();
+
+    if (!name || price === undefined) {
       if (req.file && req.file.relativeUrl) {
         await deleteLocalImage(req.file.relativeUrl);
       }
-      return res.status(400).json({ success: false, message: 'Name, price, and meal_type are required fields.' });
+      return res.status(400).json({ success: false, message: 'Name and price are required fields.' });
     }
 
     // Default placeholder image or uploaded image
@@ -552,19 +580,36 @@ const createMenuItem = async (req, res) => {
       ? JSON.stringify(variantsData)
       : null;
 
+    const finalUnit = unit || 'piece';
+    const finalMrp = mrp !== undefined ? Number(mrp) : Number(price);
+    const finalBrand = brand || null;
+    const finalBarcode = barcode || null;
+    const finalStockQty = stock_quantity !== undefined ? Number(stock_quantity) : 100;
+    const finalDiscount = discount_percentage !== undefined ? Number(discount_percentage) : 0;
+
     const connection = await pool.getConnection();
     let menuItemId;
     try {
       await connection.beginTransaction();
 
       const [menuResult] = await connection.execute(
-        `INSERT INTO MenuItem (name, image_url, meal_type, price, description, is_active, has_variants, variants)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO MenuItem (
+          name, image_url, meal_type, category, price, mrp, unit, brand, barcode, 
+          stock_quantity, in_stock, discount_percentage, description, is_active, has_variants, variants
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           name.trim(),
           finalImageUrl,
-          meal_type.toLowerCase(),
+          resolvedMealType,
+          resolvedCategory,
           Number(price),
+          finalMrp,
+          finalUnit,
+          finalBrand,
+          finalBarcode,
+          finalStockQty,
+          parsedIsActive ? 1 : 0,
+          finalDiscount,
           description || '',
           parsedIsActive ? 1 : 0,
           parsedHasVariants ? 1 : 0,

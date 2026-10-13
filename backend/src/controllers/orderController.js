@@ -519,12 +519,13 @@ const createRazorpayOrder = async (req, res) => {
     try {
       const [orderResult] = await pool.execute(
         `INSERT INTO \`Order\` (
-           student_id, customer_name, meal_type, subtotal_amount, discount_percentage, discount_amount, discount_type, total_amount,
+           student_id, customer_id, customer_name, meal_type, subtotal_amount, discount_percentage, discount_amount, discount_type, total_amount,
            payment_status, payment_method, razorpay_order_id, razorpay_payment_id, razorpay_signature, token_number, daily_sequence,
-           order_status, date, order_type, address_id, society_name, wing_name, flat_number, landmark, pincode, mobile_number
+           order_status, date, order_type, delivery_type, address_id, society_name, wing_name, flat_number, landmark, pincode, mobile_number
          )
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'pending', 'razorpay', ?, NULL, NULL, NULL, NULL, 'pending', ?, 'dine_in', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending', 'razorpay', ?, NULL, NULL, NULL, NULL, 'pending', ?, 'dine_in', 'pickup', ?, ?, ?, ?, ?, ?, ?)`,
         [
+          studentId,
           studentId,
           effectiveMealType,
           discountInfo.subtotal_amount,
@@ -547,9 +548,9 @@ const createRazorpayOrder = async (req, res) => {
 
       for (const it of validatedItems) {
         await pool.execute(
-          `INSERT INTO OrderItem (order_id, menu_item_id, item_name, price, quantity, variant_name)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [pendingOrderId, it.menu_item_id, it.item_name, it.price, it.quantity, it.variant_name || null]
+          `INSERT INTO OrderItem (order_id, menu_item_id, product_id, item_name, price, quantity, variant_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [pendingOrderId, it.menu_item_id, it.menu_item_id, it.item_name, it.price, it.quantity, it.variant_name || null]
         );
       }
     } catch (dbErr) {

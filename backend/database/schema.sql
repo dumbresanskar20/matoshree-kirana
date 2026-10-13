@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `Student` (
   `name` VARCHAR(255) NOT NULL,
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `phone` VARCHAR(20) NULL UNIQUE,
-  `roll_no` VARCHAR(255) NOT NULL UNIQUE,
+  `roll_no` VARCHAR(255) NULL,
   `password_hash` VARCHAR(255) NOT NULL,
   `is_verified` TINYINT(1) NOT NULL DEFAULT 0,
   `otp_code` VARCHAR(10) NULL,
@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS `Student` (
   `reset_token` VARCHAR(255) NULL,
   `reset_token_expires` DATETIME NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `address` VARCHAR(500) NULL,
+  `city` VARCHAR(100) NULL,
+  `pincode` VARCHAR(10) NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -43,36 +46,48 @@ CREATE TABLE IF NOT EXISTS `AdminUser` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- -------------------------------------------------------------
--- Table: MenuItem
+-- Table: MenuItem (Kirana Product Model)
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `MenuItem` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
   `image_url` VARCHAR(500) NOT NULL DEFAULT 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
   `cloudinary_public_id` VARCHAR(255) NULL,
+  `category` VARCHAR(100) NULL,
   `meal_type` VARCHAR(50) NOT NULL,
   `price` DECIMAL(10, 2) NOT NULL,
+  `mrp` DECIMAL(10, 2) NULL,
+  `unit` VARCHAR(50) NOT NULL DEFAULT 'piece',
+  `brand` VARCHAR(100) NULL,
+  `barcode` VARCHAR(100) NULL,
+  `stock_quantity` DECIMAL(10, 2) NOT NULL DEFAULT 100.00,
+  `in_stock` TINYINT(1) NOT NULL DEFAULT 1,
+  `discount_percentage` DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `description` TEXT NULL,
   `has_variants` TINYINT(1) NOT NULL DEFAULT 0,
   `variants` JSON NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX `idx_meal_active` (`meal_type`, `is_active`)
+  INDEX `idx_meal_active` (`meal_type`, `is_active`),
+  INDEX `idx_category_active` (`category`, `is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- -------------------------------------------------------------
--- Table: MealWindow
+-- Table: MealWindow (Kirana Category Model)
 -- -------------------------------------------------------------
 DROP TABLE IF EXISTS `MealWindow`;
 CREATE TABLE `MealWindow` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `meal_type` VARCHAR(50) NOT NULL UNIQUE,
-  `start_time` VARCHAR(10) NOT NULL, -- HH:mm (24h)
-  `end_time` VARCHAR(10) NOT NULL,   -- HH:mm (24h)
-  `serving_start_time` VARCHAR(10) NULL, -- HH:mm (24h) meal distribution start time shown on notice
+  `category_name` VARCHAR(100) NULL,
+  `icon` VARCHAR(100) NULL,
+  `display_order` INT NOT NULL DEFAULT 0,
+  `start_time` VARCHAR(10) NOT NULL DEFAULT '00:00', -- HH:mm (24h)
+  `end_time` VARCHAR(10) NOT NULL DEFAULT '23:59',   -- HH:mm (24h)
+  `serving_start_time` VARCHAR(10) NULL,
   `custom_note` VARCHAR(255) NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
-  `is_full_day` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_full_day` TINYINT(1) NOT NULL DEFAULT 1,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -100,6 +115,7 @@ CREATE TABLE IF NOT EXISTS `user_addresses` (
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Order` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `customer_id` INT NULL,
   `student_id` INT NULL,
   `customer_name` VARCHAR(255) NULL,
   `token_number` VARCHAR(50) NOT NULL DEFAULT '',
@@ -108,6 +124,7 @@ CREATE TABLE IF NOT EXISTS `Order` (
   `status` VARCHAR(50) NOT NULL DEFAULT 'booked',
   `order_status` VARCHAR(50) NOT NULL DEFAULT 'placed',
   `order_type` VARCHAR(20) NOT NULL DEFAULT 'dine_in',
+  `delivery_type` VARCHAR(50) NOT NULL DEFAULT 'pickup',
   `date` VARCHAR(10) NOT NULL DEFAULT '',
   `daily_sequence` INT NOT NULL DEFAULT 1,
   `subtotal_amount` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
@@ -135,7 +152,9 @@ CREATE TABLE IF NOT EXISTS `Order` (
   INDEX `idx_order_status_meal` (`order_status`, `meal_type`),
   INDEX `idx_order_date` (`date`),
   INDEX `idx_order_student` (`student_id`),
+  INDEX `idx_order_customer` (`customer_id`),
   FOREIGN KEY (`student_id`) REFERENCES `Student`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`customer_id`) REFERENCES `Student`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`address_id`) REFERENCES `user_addresses`(`id`) ON DELETE SET NULL,
   FOREIGN KEY (`collected_by_admin_id`) REFERENCES `AdminUser`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -146,6 +165,7 @@ CREATE TABLE IF NOT EXISTS `Order` (
 CREATE TABLE IF NOT EXISTS `OrderItem` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `order_id` INT NOT NULL,
+  `product_id` INT NULL,
   `menu_item_id` INT NULL,
   `item_name` VARCHAR(255) NOT NULL,
   `price` DECIMAL(10, 2) NOT NULL,
@@ -493,5 +513,101 @@ ALTER TABLE `Order` MODIFY COLUMN `expires_at` DATETIME NULL;
 ALTER TABLE `Order` MODIFY COLUMN `token_number` VARCHAR(50) NOT NULL DEFAULT '';
 ALTER TABLE `Order` MODIFY COLUMN `formatted_token` VARCHAR(50) NULL DEFAULT '';
 ALTER TABLE `Order` MODIFY COLUMN `payment_method` VARCHAR(50) NOT NULL DEFAULT 'cash';
+
+-- -------------------------------------------------------------
+-- Views for Kirana Product Nomenclature (Backward Compatible)
+-- -------------------------------------------------------------
+CREATE OR REPLACE VIEW `Product` AS
+SELECT 
+  `id`,
+  `name`,
+  `image_url`,
+  `cloudinary_public_id`,
+  COALESCE(`category`, `meal_type`) AS `category`,
+  `meal_type`,
+  `price`,
+  COALESCE(`mrp`, `price`) AS `mrp`,
+  `unit`,
+  `brand`,
+  `barcode`,
+  `stock_quantity`,
+  `in_stock`,
+  `is_active`,
+  `description`,
+  `has_variants`,
+  `variants`,
+  `discount_percentage`,
+  `created_at`
+FROM `MenuItem`;
+
+CREATE OR REPLACE VIEW `Customer` AS
+SELECT 
+  `id`,
+  `name`,
+  `email`,
+  `phone`,
+  `roll_no`,
+  `password_hash`,
+  `is_verified`,
+  `otp_code`,
+  `otp_expires_at`,
+  `failed_login_attempts`,
+  `locked_until`,
+  `is_active`,
+  `address`,
+  `city`,
+  `pincode`,
+  `created_at`
+FROM `Student`;
+
+CREATE OR REPLACE VIEW `Category` AS
+SELECT 
+  `id`,
+  `meal_type` AS `code`,
+  COALESCE(`category_name`, `meal_type`) AS `name`,
+  `icon`,
+  `display_order`,
+  `start_time`,
+  `end_time`,
+  `custom_note`,
+  `is_active`,
+  `is_full_day`,
+  `updated_at`
+FROM `MealWindow`;
+
+CREATE OR REPLACE VIEW `CustomerOrder` AS
+SELECT 
+  `id`,
+  COALESCE(`customer_id`, `student_id`) AS `customer_id`,
+  `student_id`,
+  `customer_name`,
+  `token_number`,
+  `formatted_token`,
+  `meal_type` AS `category`,
+  `status`,
+  `order_status`,
+  `order_type`,
+  `delivery_type`,
+  `date`,
+  `daily_sequence`,
+  `subtotal_amount`,
+  `discount_percentage`,
+  `discount_amount`,
+  `discount_type`,
+  `total_amount`,
+  `is_paid`,
+  `payment_status`,
+  `payment_method`,
+  `razorpay_order_id`,
+  `razorpay_payment_id`,
+  `address_id`,
+  `society_name`,
+  `wing_name`,
+  `flat_number`,
+  `landmark`,
+  `pincode`,
+  `mobile_number`,
+  `created_at`
+FROM `Order`;
 
 SET FOREIGN_KEY_CHECKS = 1;
