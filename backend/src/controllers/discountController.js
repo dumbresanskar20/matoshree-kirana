@@ -270,50 +270,54 @@ const updateDiscountSettings = async (req, res) => {
       ]
     );
 
-    // 4. Update MealDiscountRule table for all provided meal_rules
-    if (Array.isArray(meal_rules) && meal_rules.length > 0) {
-      for (const rule of meal_rules) {
-        const type = (rule.meal_type || '').toLowerCase().trim();
-        if (!type) continue;
-        const pct = validatePercentage(rule.discount_percentage != null ? rule.discount_percentage : 0, `${type} discount percentage`);
-        const cutoff = validateTime(rule.cutoff_time || '12:00', `${type} cutoff time`);
-        const startTime = validateStartTime(rule.discount_start_time, cutoff, `${type}`);
-        const enabled = Boolean(rule.is_enabled);
-        const name = rule.display_name || `Early ${type.charAt(0).toUpperCase() + type.slice(1)} Discount`;
+    // 4. Update MealDiscountRule table for all provided meal_rules if table exists
+    try {
+      if (Array.isArray(meal_rules) && meal_rules.length > 0) {
+        for (const rule of meal_rules) {
+          const type = (rule.meal_type || '').toLowerCase().trim();
+          if (!type) continue;
+          const pct = validatePercentage(rule.discount_percentage != null ? rule.discount_percentage : 0, `${type} discount percentage`);
+          const cutoff = validateTime(rule.cutoff_time || '12:00', `${type} cutoff time`);
+          const startTime = validateStartTime(rule.discount_start_time, cutoff, `${type}`);
+          const enabled = Boolean(rule.is_enabled);
+          const name = rule.display_name || `Early ${type.charAt(0).toUpperCase() + type.slice(1)} Discount`;
 
-        await pool.execute(
-          `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, discount_start_time, cutoff_time, is_enabled)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE 
-             display_name = VALUES(display_name),
-             discount_percentage = VALUES(discount_percentage),
-             discount_start_time = VALUES(discount_start_time),
-             cutoff_time = VALUES(cutoff_time),
-             is_enabled = VALUES(is_enabled)`,
-          [type, name, pct, startTime, cutoff, enabled ? 1 : 0]
-        );
+          await pool.execute(
+            `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, discount_start_time, cutoff_time, is_enabled)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE 
+               display_name = VALUES(display_name),
+               discount_percentage = VALUES(discount_percentage),
+               discount_start_time = VALUES(discount_start_time),
+               cutoff_time = VALUES(cutoff_time),
+               is_enabled = VALUES(is_enabled)`,
+            [type, name, pct, startTime, cutoff, enabled ? 1 : 0]
+          );
+        }
+      } else {
+        // Synchronize core 4 meal types into MealDiscountRule if no custom array passed
+        const coreRules = [
+          ['breakfast', 'Early Breakfast Discount', cleanBreakfastPercentage, cleanBreakfastStart, cleanBreakfastCutoff, cleanBreakfastEnabled ? 1 : 0],
+          ['lunch',     'Early Lunch Discount',     cleanLunchPercentage,     cleanLunchStart,     cleanLunchCutoff,     cleanLunchEnabled ? 1 : 0],
+          ['snacks',    'Early Snacks Discount',    cleanSnacksPercentage,    cleanSnacksStart,    cleanSnacksCutoff,    cleanSnacksEnabled ? 1 : 0],
+          ['dinner',    'Early Dinner Discount',    cleanDinnerPercentage,    cleanDinnerStart,    cleanDinnerCutoff,    cleanDinnerEnabled ? 1 : 0],
+        ];
+        for (const [type, name, pct, sTime, cutoff, enabled] of coreRules) {
+          await pool.execute(
+            `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, discount_start_time, cutoff_time, is_enabled)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE 
+               display_name = VALUES(display_name),
+               discount_percentage = VALUES(discount_percentage),
+               discount_start_time = VALUES(discount_start_time),
+               cutoff_time = VALUES(cutoff_time),
+               is_enabled = VALUES(is_enabled)`,
+            [type, name, pct, sTime, cutoff, enabled]
+          );
+        }
       }
-    } else {
-      // Synchronize core 4 meal types into MealDiscountRule if no custom array passed
-      const coreRules = [
-        ['breakfast', 'Early Breakfast Discount', cleanBreakfastPercentage, cleanBreakfastStart, cleanBreakfastCutoff, cleanBreakfastEnabled ? 1 : 0],
-        ['lunch',     'Early Lunch Discount',     cleanLunchPercentage,     cleanLunchStart,     cleanLunchCutoff,     cleanLunchEnabled ? 1 : 0],
-        ['snacks',    'Early Snacks Discount',    cleanSnacksPercentage,    cleanSnacksStart,    cleanSnacksCutoff,    cleanSnacksEnabled ? 1 : 0],
-        ['dinner',    'Early Dinner Discount',    cleanDinnerPercentage,    cleanDinnerStart,    cleanDinnerCutoff,    cleanDinnerEnabled ? 1 : 0],
-      ];
-      for (const [type, name, pct, sTime, cutoff, enabled] of coreRules) {
-        await pool.execute(
-          `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, discount_start_time, cutoff_time, is_enabled)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE 
-             display_name = VALUES(display_name),
-             discount_percentage = VALUES(discount_percentage),
-             discount_start_time = VALUES(discount_start_time),
-             cutoff_time = VALUES(cutoff_time),
-             is_enabled = VALUES(is_enabled)`,
-          [type, name, pct, sTime, cutoff, enabled]
-        );
-      }
+    } catch (_ruleTblErr) {
+      // MealDiscountRule table removed for Kirana store
     }
 
     // 5. Record entry in DiscountAuditLog
@@ -393,18 +397,22 @@ const createOrUpdateMealDiscountRule = async (req, res) => {
       [cleanMealType]
     );
 
-    // 2. Insert or update in MealDiscountRule
-    await pool.execute(
-      `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, discount_start_time, cutoff_time, is_enabled)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE 
-         display_name = VALUES(display_name),
-         discount_percentage = VALUES(discount_percentage),
-         discount_start_time = VALUES(discount_start_time),
-         cutoff_time = VALUES(cutoff_time),
-         is_enabled = VALUES(is_enabled)`,
-      [cleanMealType, cleanName, cleanPercentage, cleanStartTime, cleanCutoff, cleanEnabled ? 1 : 0]
-    );
+    // 2. Insert or update in MealDiscountRule if table exists
+    try {
+      await pool.execute(
+        `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, discount_start_time, cutoff_time, is_enabled)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE 
+           display_name = VALUES(display_name),
+           discount_percentage = VALUES(discount_percentage),
+           discount_start_time = VALUES(discount_start_time),
+           cutoff_time = VALUES(cutoff_time),
+           is_enabled = VALUES(is_enabled)`,
+        [cleanMealType, cleanName, cleanPercentage, cleanStartTime, cleanCutoff, cleanEnabled ? 1 : 0]
+      );
+    } catch (_ruleTblErr) {
+      // MealDiscountRule table removed for Kirana store
+    }
 
     // 3. Keep DiscountSettings column in sync if it's one of core meals
     if (['breakfast', 'lunch', 'snacks', 'dinner'].includes(cleanMealType)) {
@@ -486,7 +494,11 @@ const deleteMealDiscountRule = async (req, res) => {
       });
     }
 
-    await pool.execute('DELETE FROM `MealDiscountRule` WHERE meal_type = ?', [cleanType]);
+    try {
+      await pool.execute('DELETE FROM `MealDiscountRule` WHERE meal_type = ?', [cleanType]);
+    } catch (_ruleTblErr) {
+      // MealDiscountRule table removed for Kirana store
+    }
 
     // Audit Log
     const adminId = req.admin ? req.admin.id : null;

@@ -23,19 +23,7 @@ const initInventorySchema = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // 2. Create RecipeItem table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS \`RecipeItem\` (
-        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-        \`menu_item_id\` INT NOT NULL,
-        \`inventory_item_id\` INT NOT NULL,
-        \`quantity_required\` DECIMAL(10, 3) NOT NULL,
-        \`quantity_unit\` ENUM('kg', 'g', 'litre', 'ml', 'piece', 'packet') NOT NULL DEFAULT 'kg',
-        UNIQUE KEY \`menu_item_inventory_item\` (\`menu_item_id\`, \`inventory_item_id\`),
-        FOREIGN KEY (\`menu_item_id\`) REFERENCES \`MenuItem\`(\`id\`) ON DELETE CASCADE,
-        FOREIGN KEY (\`inventory_item_id\`) REFERENCES \`InventoryItem\`(\`id\`) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
+    // RecipeItem table skipped (Kirana store manages product stock directly)
 
     // 3. Create InventoryLog table
     await pool.query(`

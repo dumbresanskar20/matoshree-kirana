@@ -218,13 +218,19 @@ const deductInventoryForOrder = async (connection, orderId) => {
   for (const item of orderItems) {
     if (!item.menu_item_id) continue;
 
-    const [recipeItems] = await connection.execute(
-      `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
-       FROM RecipeItem ri
-       INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
-       WHERE ri.menu_item_id = ?`,
-      [item.menu_item_id]
-    );
+    let recipeItems = [];
+    try {
+      const [rows] = await connection.execute(
+        `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
+         FROM RecipeItem ri
+         INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
+         WHERE ri.menu_item_id = ?`,
+        [item.menu_item_id]
+      );
+      recipeItems = rows;
+    } catch (_) {
+      recipeItems = [];
+    }
 
     for (const ri of recipeItems) {
       const convertedRequired = convertToInventoryBaseUnit(
@@ -417,13 +423,19 @@ const createRazorpayOrder = async (req, res) => {
     for (const item of validatedItems) {
       if (!item.menu_item_id) continue;
 
-      const [recipeItems] = await pool.execute(
-        `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
-         FROM RecipeItem ri
-         INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
-         WHERE ri.menu_item_id = ?`,
-        [item.menu_item_id]
-      );
+      let recipeItems = [];
+      try {
+        const [rows] = await pool.execute(
+          `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
+           FROM RecipeItem ri
+           INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
+           WHERE ri.menu_item_id = ?`,
+          [item.menu_item_id]
+        );
+        recipeItems = rows;
+      } catch (_) {
+        recipeItems = [];
+      }
 
       for (const ri of recipeItems) {
         const convertedRequired = convertToInventoryBaseUnit(
@@ -2310,13 +2322,19 @@ const createManualOrder = async (req, res) => {
     for (const item of validatedItems) {
       if (!item.menu_item_id) continue;
 
-      const [recipeItems] = await pool.execute(
-        `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
-         FROM RecipeItem ri
-         INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
-         WHERE ri.menu_item_id = ?`,
-        [item.menu_item_id]
-      );
+      let recipeItems = [];
+      try {
+        const [rows] = await pool.execute(
+          `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
+           FROM RecipeItem ri
+           INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
+           WHERE ri.menu_item_id = ?`,
+          [item.menu_item_id]
+        );
+        recipeItems = rows;
+      } catch (_) {
+        recipeItems = [];
+      }
 
       for (const ri of recipeItems) {
         const convertedRequired = convertToInventoryBaseUnit(

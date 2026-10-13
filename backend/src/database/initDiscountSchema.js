@@ -134,78 +134,8 @@ const initDiscountSchema = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // 5. Create MealDiscountRule table for dynamic per-meal discount rules
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS \`MealDiscountRule\` (
-        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-        \`meal_type\` VARCHAR(50) NOT NULL UNIQUE,
-        \`display_name\` VARCHAR(100) NOT NULL,
-        \`discount_percentage\` DECIMAL(5, 2) NOT NULL DEFAULT 10.00,
-        \`cutoff_time\` VARCHAR(10) NOT NULL DEFAULT '12:00',
-        \`is_enabled\` TINYINT(1) NOT NULL DEFAULT 1,
-        \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-
-    // Ensure discount_start_time column exists in MealDiscountRule
-    try {
-      const [existingRuleCol] = await pool.query(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'MealDiscountRule' AND COLUMN_NAME = 'discount_start_time' LIMIT 1`
-      );
-      if (existingRuleCol.length === 0) {
-        await pool.query("ALTER TABLE `MealDiscountRule` ADD COLUMN `discount_start_time` VARCHAR(10) NULL DEFAULT NULL AFTER `discount_percentage`");
-        console.log("✅ [Database] Added `discount_start_time` column to `MealDiscountRule`.");
-      }
-    } catch (colErr) {
-      console.warn("⚠️ [Database] Column migration check warning for MealDiscountRule.discount_start_time:", colErr.message);
-    }
-
-    // Ensure default core meal types exist in MealDiscountRule
-    const defaultRules = [
-      ['breakfast', 'Early Breakfast Discount', 10.00, '09:00', 1],
-      ['lunch',     'Early Lunch Discount',     10.00, '12:00', 1],
-      ['snacks',    'Early Snacks Discount',    10.00, '17:00', 1],
-      ['dinner',    'Early Dinner Discount',    10.00, '20:30', 1],
-    ];
-
-    for (const [meal_type, display_name, pct, cutoff, enabled] of defaultRules) {
-      await pool.execute(
-        `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, cutoff_time, is_enabled)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE id = id`,
-        [meal_type, display_name, pct, cutoff, enabled]
-      );
-    }
-
-    // Auto-sync any existing custom meal types from MealWindow into MealDiscountRule
-    try {
-      const [customWindows] = await pool.query('SELECT meal_type, end_time FROM `MealWindow`');
-      if (customWindows && customWindows.length > 0) {
-        for (const win of customWindows) {
-          const type = (win.meal_type || '').toLowerCase().trim();
-          if (!type) continue;
-          const [exists] = await pool.execute(
-            'SELECT id FROM `MealDiscountRule` WHERE meal_type = ? LIMIT 1',
-            [type]
-          );
-          if (exists.length === 0) {
-            const prettyName = 'Early ' + type.charAt(0).toUpperCase() + type.slice(1) + ' Discount';
-            await pool.execute(
-              `INSERT INTO \`MealDiscountRule\` (meal_type, display_name, discount_percentage, cutoff_time, is_enabled)
-               VALUES (?, ?, ?, ?, ?)`,
-              [type, prettyName, 10.00, win.end_time || '18:00', 1]
-            );
-            console.log(`✅ [Database] Auto-registered discount rule for meal type: ${type}`);
-          }
-        }
-      }
-    } catch (syncErr) {
-      console.warn('[Database] MealWindow sync warning:', syncErr.message);
-    }
-
-    console.log('✅ [Database] Discount schema and dynamic meal rules initialized successfully.');
+    // MealDiscountRule skipped (canteen early meal discount rule is not used in Kirana store)
+    console.log('✅ [Database] Discount settings and audit log schema initialized successfully.');
   } catch (error) {
     console.error('⚠️ [Database] Failed to initialize discount schema:', error.message);
   }

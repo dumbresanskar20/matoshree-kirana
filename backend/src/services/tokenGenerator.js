@@ -24,25 +24,46 @@ const generateTokenNumber = async (mealType, dateString, existingConnection = nu
       await connection.beginTransaction();
     }
 
-    // Atomic increment: insert if not exists, else increment. Fully safe under concurrency.
-    await connection.execute(
-      `INSERT INTO DailyTokenCounter (meal_type, date, last_token_number)
-       VALUES (?, ?, 1)
-       ON DUPLICATE KEY UPDATE last_token_number = last_token_number + 1`,
-      [counterKey, dateString]
-    );
+    let nextSeq = 1;
+    let counterSuccess = false;
 
-    const [rows] = await connection.execute(
-      `SELECT last_token_number FROM DailyTokenCounter 
-       WHERE meal_type = ? AND date = ? LIMIT 1`,
-      [counterKey, dateString]
-    );
+    try {
+      // Atomic increment: insert if not exists, else increment. Fully safe under concurrency.
+      await connection.execute(
+        `INSERT INTO DailyTokenCounter (meal_type, date, last_token_number)
+         VALUES (?, ?, 1)
+         ON DUPLICATE KEY UPDATE last_token_number = last_token_number + 1`,
+        [counterKey, dateString]
+      );
+
+      const [rows] = await connection.execute(
+        `SELECT last_token_number FROM DailyTokenCounter 
+         WHERE meal_type = ? AND date = ? LIMIT 1`,
+        [counterKey, dateString]
+      );
+      if (rows && rows.length > 0) {
+        nextSeq = rows[0].last_token_number;
+        counterSuccess = true;
+      }
+    } catch (_counterErr) {
+      // DailyTokenCounter table does not exist or was removed for Kirana store
+    }
+
+    if (!counterSuccess) {
+      // Direct fallback to Order daily_sequence without requiring DailyTokenCounter table
+      const [orderRows] = await connection.execute(
+        `SELECT COALESCE(MAX(daily_sequence), 0) + 1 AS next_seq 
+         FROM \`Order\` 
+         WHERE date = ? FOR UPDATE`,
+        [dateString]
+      );
+      nextSeq = orderRows[0]?.next_seq || 1;
+    }
 
     if (shouldManageTransaction) {
       await connection.commit();
     }
 
-    const nextSeq = rows[0].last_token_number;
     const tokenNumber = `T-${String(nextSeq).padStart(3, '0')}`;
 
     return {

@@ -284,16 +284,22 @@ const getMenuItems = async (req, res) => {
         const menuItemIds = items.map((it) => it.id);
         const placeholders = menuItemIds.map(() => '?').join(', ');
         
-        const [recipeRows] = await pool.query(
-          `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit, 
-                  ii.quantity_in_stock AS inventory_item_quantity_in_stock, 
-                  ii.low_stock_threshold AS inventory_item_low_stock_threshold,
-                  ii.category AS inventory_item_category, ii.is_active AS inventory_item_is_active
-           FROM RecipeItem ri
-           INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
-           WHERE ri.menu_item_id IN (${placeholders})`,
-          menuItemIds
-        );
+        let recipeRows = [];
+        try {
+          const [rows] = await pool.query(
+            `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit, 
+                    ii.quantity_in_stock AS inventory_item_quantity_in_stock, 
+                    ii.low_stock_threshold AS inventory_item_low_stock_threshold,
+                    ii.category AS inventory_item_category, ii.is_active AS inventory_item_is_active
+             FROM RecipeItem ri
+             INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
+             WHERE ri.menu_item_id IN (${placeholders})`,
+            menuItemIds
+          );
+          recipeRows = rows;
+        } catch (_) {
+          recipeRows = [];
+        }
 
         let ratingMap = {};
         try {
@@ -400,16 +406,22 @@ const getMenuItems = async (req, res) => {
         const menuItemIds = items.map((it) => it.id);
         const placeholders = menuItemIds.map(() => '?').join(', ');
         
-        const [recipeRows] = await pool.query(
-          `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit, 
-                  ii.quantity_in_stock AS inventory_item_quantity_in_stock, 
-                  ii.low_stock_threshold AS inventory_item_low_stock_threshold,
-                  ii.category AS inventory_item_category, ii.is_active AS inventory_item_is_active
-           FROM RecipeItem ri
-           INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
-           WHERE ri.menu_item_id IN (${placeholders})`,
-          menuItemIds
-        );
+        let recipeRows = [];
+        try {
+          const [rows] = await pool.query(
+            `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit, 
+                    ii.quantity_in_stock AS inventory_item_quantity_in_stock, 
+                    ii.low_stock_threshold AS inventory_item_low_stock_threshold,
+                    ii.category AS inventory_item_category, ii.is_active AS inventory_item_is_active
+             FROM RecipeItem ri
+             INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
+             WHERE ri.menu_item_id IN (${placeholders})`,
+            menuItemIds
+          );
+          recipeRows = rows;
+        } catch (_) {
+          recipeRows = [];
+        }
 
         let ratingMap = {};
         try {

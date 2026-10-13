@@ -321,10 +321,16 @@ const getAllMealSlots = async () => {
  */
 const getMealSlotsForType = async (mealType) => {
   const cleanType = String(mealType || '').toLowerCase().trim();
-  const [rows] = await pool.execute(
-    'SELECT * FROM `meal_serving_slots` WHERE LOWER(meal_type) = ? ORDER BY slot_number ASC',
-    [cleanType]
-  );
+  let rows = [];
+  try {
+    const [resultRows] = await pool.execute(
+      'SELECT * FROM `meal_serving_slots` WHERE LOWER(meal_type) = ? ORDER BY slot_number ASC',
+      [cleanType]
+    );
+    rows = resultRows || [];
+  } catch (_slotErr) {
+    // meal_serving_slots table removed for Kirana store
+  }
 
   let customNote = null;
   let isFullDay = false;
@@ -371,31 +377,34 @@ const saveMealSlotsForType = async (mealType, slot1Data, slot2Data, options = {}
     validated2.note = customNote;
   }
 
-  // Upsert Slot 1
-  await pool.execute(
-    `INSERT INTO \`meal_serving_slots\` (meal_type, slot_number, start_datetime, end_datetime, is_active, note)
-     VALUES (?, 1, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       start_datetime = VALUES(start_datetime),
-       end_datetime = VALUES(end_datetime),
-       is_active = VALUES(is_active),
-       note = VALUES(note),
-       updated_at = CURRENT_TIMESTAMP`,
-    [cleanType, validated1.start_datetime, validated1.end_datetime, validated1.is_active, validated1.note]
-  );
+  // Upsert slots if meal_serving_slots table exists
+  try {
+    await pool.execute(
+      `INSERT INTO \`meal_serving_slots\` (meal_type, slot_number, start_datetime, end_datetime, is_active, note)
+       VALUES (?, 1, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         start_datetime = VALUES(start_datetime),
+         end_datetime = VALUES(end_datetime),
+         is_active = VALUES(is_active),
+         note = VALUES(note),
+         updated_at = CURRENT_TIMESTAMP`,
+      [cleanType, validated1.start_datetime, validated1.end_datetime, validated1.is_active, validated1.note]
+    );
 
-  // Upsert Slot 2
-  await pool.execute(
-    `INSERT INTO \`meal_serving_slots\` (meal_type, slot_number, start_datetime, end_datetime, is_active, note)
-     VALUES (?, 2, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       start_datetime = VALUES(start_datetime),
-       end_datetime = VALUES(end_datetime),
-       is_active = VALUES(is_active),
-       note = VALUES(note),
-       updated_at = CURRENT_TIMESTAMP`,
-    [cleanType, validated2.start_datetime, validated2.end_datetime, validated2.is_active, validated2.note]
-  );
+    await pool.execute(
+      `INSERT INTO \`meal_serving_slots\` (meal_type, slot_number, start_datetime, end_datetime, is_active, note)
+       VALUES (?, 2, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         start_datetime = VALUES(start_datetime),
+         end_datetime = VALUES(end_datetime),
+         is_active = VALUES(is_active),
+         note = VALUES(note),
+         updated_at = CURRENT_TIMESTAMP`,
+      [cleanType, validated2.start_datetime, validated2.end_datetime, validated2.is_active, validated2.note]
+    );
+  } catch (_slotsErr) {
+    // meal_serving_slots table removed for Kirana store
+  }
 
   // Backwards compatibility: keep MealWindow in sync
   try {

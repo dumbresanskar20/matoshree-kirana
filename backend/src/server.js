@@ -280,9 +280,7 @@ connectDB().then(async () => {
     try { await ensureMealWindowTable(); } catch (e) { console.warn('[Startup] ensureMealWindowTable warning:', e.message); }
   }
 
-  if (typeof initMealSlotsSchema === 'function') {
-    try { await initMealSlotsSchema(); } catch (e) { console.warn('[Startup] initMealSlotsSchema warning:', e.message); }
-  }
+  // Legacy canteen meal serving slots skipped for Kirana store
 
   if (typeof initStudentSchema === 'function') {
     try { await initStudentSchema(); } catch (e) { console.warn('[Startup] initStudentSchema warning:', e.message); }
