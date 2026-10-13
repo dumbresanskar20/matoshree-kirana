@@ -371,7 +371,7 @@ export default function MenuManagement() {
       });
 
       if (res.data && res.data.success) {
-        showToast(`🎉 Meal type renamed from '${renameTargetType}' to '${cleanNewType}' successfully!`, 'success');
+        showToast(`🎉 Category renamed from '${renameTargetType}' to '${cleanNewType}' successfully!`, 'success');
         await fetchMealTypes();
         // If the active filter or current menu item mealType matches the old name, update it
         if (filterMeal === renameTargetType) {
@@ -385,11 +385,11 @@ export default function MenuManagement() {
         setRenameTargetType('');
         setRenameNewTypeName('');
       } else {
-        showToast(res.data?.message || 'Failed to rename meal type.', 'error');
+        showToast(res.data?.message || 'Failed to rename category.', 'error');
       }
     } catch (err) {
-      console.error('Error renaming meal type:', err);
-      showToast(err.response?.data?.message || err.message || 'Error renaming meal type.', 'error');
+      console.error('Error renaming category:', err);
+      showToast(err.response?.data?.message || err.message || 'Error renaming category.', 'error');
     } finally {
       setRenamingMealType(false);
     }

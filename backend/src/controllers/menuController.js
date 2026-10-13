@@ -1313,34 +1313,89 @@ const renameMealType = async (req, res) => {
     await connection.beginTransaction();
 
     // 1. Update MealWindow
-    await connection.execute('UPDATE `MealWindow` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    try {
+      await connection.execute('UPDATE `MealWindow` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    } catch (mwErr) {
+      console.warn('[renameMealType] MealWindow update warning:', mwErr.message);
+    }
 
-    // 2. Update MealDiscountRule (and update display_name nicely)
+    // 2. Update Category table if present in Kirana schema
     const words = new_meal_type.trim().split(/[\s_-]+/);
     const prettyType = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    const displayName = `Early ${prettyType} Discount`;
+    try {
+      await connection.execute('UPDATE `Category` SET code = ?, name = ? WHERE code = ?', [cleanNewType, prettyType, cleanOldType]);
+    } catch (catErr) {
+      // Category table skipped if not present or MealWindow is base table
+    }
 
-    await connection.execute(
-      'UPDATE `MealDiscountRule` SET meal_type = ?, display_name = ? WHERE meal_type = ?',
-      [cleanNewType, displayName, cleanOldType]
-    );
+    // 3. Update MealDiscountRule if table exists (omitted/dropped in Kirana store schema)
+    try {
+      const displayName = `Early ${prettyType} Discount`;
+      await connection.execute(
+        'UPDATE `MealDiscountRule` SET meal_type = ?, display_name = ? WHERE meal_type = ?',
+        [cleanNewType, displayName, cleanOldType]
+      );
+    } catch (ruleErr) {
+      // MealDiscountRule table removed for Kirana store
+      console.warn('[renameMealType] MealDiscountRule update skipped:', ruleErr.message);
+    }
 
-    // 3. Update MenuItem catalog
-    await connection.execute('UPDATE `MenuItem` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    // 4. Update MenuItem catalog (both meal_type and category fields)
+    try {
+      await connection.execute('UPDATE `MenuItem` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    } catch (miErr) {
+      console.warn('[renameMealType] MenuItem meal_type update warning:', miErr.message);
+    }
+    try {
+      await connection.execute('UPDATE `MenuItem` SET category = ? WHERE category = ?', [cleanNewType, cleanOldType]);
+    } catch (miCatErr) {
+      // category column might not exist on legacy MenuItem table
+    }
 
-    // 4. Update Order records
-    await connection.execute('UPDATE `Order` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    // 5. Update Product table directly if it exists as a separate base table
+    try {
+      await connection.execute(
+        'UPDATE `Product` SET meal_type = CASE WHEN meal_type = ? THEN ? ELSE meal_type END, category = CASE WHEN category = ? THEN ? ELSE category END WHERE meal_type = ? OR category = ?',
+        [cleanOldType, cleanNewType, cleanOldType, cleanNewType, cleanOldType, cleanOldType]
+      );
+    } catch (prodErr) {
+      // Product table skipped if not present or view
+    }
 
-    // 5. Update DailyTokenCounter if table exists
+    // 6. Update Order records
+    try {
+      await connection.execute('UPDATE `Order` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    } catch (orderErr) {
+      console.warn('[renameMealType] Order update skipped/warning:', orderErr.message);
+    }
+
+    // 7. Update DailyTokenCounter if table exists
     try {
       await connection.execute('UPDATE `DailyTokenCounter` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
     } catch (tokenErr) {
       console.warn('[renameMealType] DailyTokenCounter update skipped/warning:', tokenErr.message);
     }
 
+    // 8. Update meal_serving_slots if table exists
+    try {
+      await connection.execute('UPDATE `meal_serving_slots` SET meal_type = ? WHERE meal_type = ?', [cleanNewType, cleanOldType]);
+    } catch (slotErr) {
+      // meal_serving_slots skipped if not present
+    }
+
+    // 9. Update ProductReview / MenuItemReview if table exists
+    try {
+      await connection.execute(
+        'UPDATE `ProductReview` SET meal_type = CASE WHEN meal_type = ? THEN ? ELSE meal_type END, category = CASE WHEN category = ? THEN ? ELSE category END WHERE meal_type = ? OR category = ?',
+        [cleanOldType, cleanNewType, cleanOldType, cleanNewType, cleanOldType, cleanOldType]
+      );
+    } catch (prErr) {
+      // ProductReview skipped if not present
+    }
+
     await connection.commit();
 
-    // 6. Emit real-time socket events for connected clients
+    // 10. Emit real-time socket events for connected clients
     try {
       const io = req.app.get('socketio');
       if (io) {
@@ -1358,7 +1413,7 @@ const renameMealType = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Meal type '${cleanOldType}' was successfully renamed to '${cleanNewType}'.`,
+      message: `Category '${cleanOldType}' was successfully renamed to '${cleanNewType}'.`,
       old_meal_type: cleanOldType,
       new_meal_type: cleanNewType,
       window: updatedWindow,
@@ -1368,7 +1423,7 @@ const renameMealType = async (req, res) => {
       try { await connection.rollback(); } catch (rbErr) { console.error('[renameMealType] Rollback error:', rbErr); }
     }
     console.error('[MenuController] renameMealType error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to rename meal type: ' + error.message });
+    return res.status(500).json({ success: false, message: 'Failed to rename category: ' + error.message });
   } finally {
     if (connection) {
       connection.release();
