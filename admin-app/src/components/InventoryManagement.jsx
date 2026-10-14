@@ -131,6 +131,13 @@ export default function InventoryManagement() {
         });
         socket.on('menu:stock_updated', () => {
           fetchMenuStock();
+          fetchItems();
+          fetchSummary();
+        });
+        socket.on('inventory:stock_updated', () => {
+          fetchItems();
+          fetchSummary();
+          fetchMenuStock();
         });
       } catch (e) {
         console.error('Socket init error in InventoryManagement:', e);

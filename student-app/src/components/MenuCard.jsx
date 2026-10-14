@@ -19,12 +19,18 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
     hasItemVariants ? item.variants[0] : null
   );
 
-  const minPrice = hasItemVariants
-    ? Math.min(...item.variants.map((v) => Number(v.price)))
-    : Number(item.price);
-  const maxPrice = hasItemVariants
-    ? Math.max(...item.variants.map((v) => Number(v.price)))
-    : Number(item.price);
+  const activeVariantPrice = selectedVariant ? Number(selectedVariant.price) : Number(item.price);
+  const isDiscountActive = Boolean(discountInfo?.is_discount_active && Number(discountInfo?.discount_percentage) > 0);
+  const discountedPrice = isDiscountActive
+    ? Math.max(0, Math.round(activeVariantPrice * (1 - Number(discountInfo.discount_percentage) / 100)))
+    : activeVariantPrice;
+
+  const categoryDisplay =
+    item.category_name ||
+    (item.category && item.category !== 'grocery' ? item.category : null) ||
+    (item.meal_type === 'grains_pulses' ? 'Grains & Pulses' : null) ||
+    (item.meal_type === 'cooking_essential' || item.meal_type === 'cooking_essentials' ? 'Cooking Essentials' : null) ||
+    (item.meal_type ? item.meal_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Grains & Pulses');
 
   // 3D Tilt Effect calculations
   const [transformStyle, setTransformStyle] = useState('perspective(1000px) rotateX(0deg) rotateY(0deg)');
@@ -58,10 +64,12 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
     }
 
     if (hasItemVariants) {
-      if (!selectedVariant && item.variants.length > 0) {
-        setSelectedVariant(item.variants[0]);
+      const variantToUse = selectedVariant || item.variants[0];
+      const success = addToCart(item, 1, variantToUse);
+      if (success !== false) {
+        setAdded(true);
+        setTimeout(() => setAdded(false), 1200);
       }
-      setIsVariantModalOpen(true);
       return;
     }
 
@@ -117,7 +125,7 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
         {/* Meal Category Badge */}
         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md text-brand-terracotta text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
           <Flame className="w-3 h-3 text-brand-orange" />
-          <span>{item.meal_type}</span>
+          <span>{categoryDisplay}</span>
         </div>
 
         {/* Top-Right Badge: Top Rated or Best Seller */}
@@ -153,21 +161,21 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
           )}
         </div>
 
-        {/* Price Tag Overlay (Bottom-Right) with Kirana MRP & Early Discount */}
+        {/* Price Tag Overlay (Bottom-Right) - Automatically reflects currently selected quantity */}
         <div className="absolute bottom-3 right-3 bg-brand-dark/90 backdrop-blur-md text-white px-3 py-1.5 rounded-2xl font-display font-extrabold shadow-lg flex items-baseline gap-1.5">
-          {discountInfo?.is_discount_active && Number(discountInfo?.discount_percentage) > 0 ? (
+          {isDiscountActive ? (
             <>
               <span className="text-amber-300 text-lg">
-                ₹{Math.max(0, Math.round(Number(minPrice) * (1 - Number(discountInfo.discount_percentage) / 100)))}
+                ₹{discountedPrice}
               </span>
               <span className="text-[11px] text-stone-400 line-through font-medium">
-                ₹{minPrice}
+                ₹{activeVariantPrice}
               </span>
             </>
-          ) : Number(item.mrp) > Number(minPrice) ? (
+          ) : Number(item.mrp) > activeVariantPrice ? (
             <>
               <span className="text-emerald-400 text-lg">
-                ₹{minPrice}
+                ₹{activeVariantPrice}
               </span>
               <span className="text-[11px] text-stone-400 line-through font-medium">
                 ₹{item.mrp}
@@ -175,12 +183,14 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
             </>
           ) : (
             <span className="text-lg">
-              {hasItemVariants && minPrice !== maxPrice ? `From ₹${minPrice}` : `₹${minPrice}`}
+              ₹{activeVariantPrice}
             </span>
           )}
-          {item.unit && (
+          {selectedVariant ? (
+            <span className="text-[10px] text-stone-300 font-bold">/{selectedVariant.name}</span>
+          ) : item.unit ? (
             <span className="text-[10px] text-stone-300 font-normal">/{item.unit}</span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -199,6 +209,47 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
           <p className="text-xs text-stone-500 mt-1.5 line-clamp-2 leading-relaxed font-medium">
             {item.description || 'Premium quality grocery product at Matoshree Kirana Store.'}
           </p>
+
+          {/* Available Quantity Options: Displayed on card, updates price automatically when clicked */}
+          {hasItemVariants && (
+            <div className="mt-3.5 pt-2.5 border-t border-stone-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider">
+                  Available Quantity Options:
+                </span>
+                {selectedVariant && (
+                  <span className="text-[11px] font-black text-brand-orange">
+                    ₹{selectedVariant.price}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {item.variants.map((v) => {
+                  const isSelected = selectedVariant?.id === v.id || selectedVariant?.name === v.name;
+                  return (
+                    <button
+                      key={v.id || v.name}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedVariant(v);
+                      }}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1 ${
+                        isSelected
+                          ? 'bg-amber-600 text-white shadow-xs scale-102 ring-2 ring-amber-400/50'
+                          : 'bg-stone-100 hover:bg-amber-50 hover:border-amber-300 text-stone-700 border border-stone-200'
+                      }`}
+                    >
+                      <span>{v.name}</span>
+                      <span className={`text-[10px] ${isSelected ? 'text-amber-100' : 'text-stone-500'}`}>
+                        = ₹{v.price}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add to Cart CTA */}
@@ -213,7 +264,7 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
             </span>
           ) : isCurrentlyOpen ? (
             <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
-              Fresh & Ready
+              In Stock
             </span>
           ) : (
             <span className="text-[11px] font-bold text-amber-900 bg-amber-100/90 px-2 py-1 rounded-lg flex items-center gap-1">
@@ -246,10 +297,10 @@ export default function MenuCard({ item, isCurrentlyOpen = true }) {
                   <Check className="w-4 h-4" />
                   <span>Added to Tray</span>
                 </>
-              ) : hasItemVariants ? (
+              ) : hasItemVariants && selectedVariant ? (
                 <>
                   <Plus className="w-4 h-4" />
-                  <span>Select Quantity</span>
+                  <span>Add {selectedVariant.name}</span>
                 </>
               ) : (
                 <>

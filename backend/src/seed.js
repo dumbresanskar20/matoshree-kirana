@@ -44,25 +44,189 @@ const seedData = async () => {
     const existingWindowsCount = windowCountResult[0].count;
     if (existingWindowsCount === 0) {
       const mealWindows = [
-        { meal_type: 'breakfast', start_time: '07:30', serving_start_time: '08:30', end_time: '10:00', is_active: true, is_full_day: false },
-        { meal_type: 'lunch', start_time: '12:00', serving_start_time: '12:30', end_time: '14:30', is_active: true, is_full_day: false },
-        { meal_type: 'snacks', start_time: '16:30', serving_start_time: '16:30', end_time: '18:00', is_active: true, is_full_day: false },
-        { meal_type: 'dinner', start_time: '19:30', serving_start_time: '19:30', end_time: '21:30', is_active: true, is_full_day: false },
+        { meal_type: 'grains_pulses', category_name: 'Grains & Pulses', start_time: '00:00', serving_start_time: '00:00', end_time: '23:59', is_active: true, is_full_day: true },
+        { meal_type: 'breakfast', category_name: 'Breakfast Essentials', start_time: '07:30', serving_start_time: '08:30', end_time: '10:00', is_active: true, is_full_day: false },
+        { meal_type: 'lunch', category_name: 'Lunch Essentials', start_time: '12:00', serving_start_time: '12:30', end_time: '14:30', is_active: true, is_full_day: false },
+        { meal_type: 'snacks', category_name: 'Evening Snacks', start_time: '16:30', serving_start_time: '16:30', end_time: '18:00', is_active: true, is_full_day: false },
+        { meal_type: 'dinner', category_name: 'Dinner Essentials', start_time: '19:30', serving_start_time: '19:30', end_time: '21:30', is_active: true, is_full_day: false },
       ];
       for (const w of mealWindows) {
         await pool.execute(
-          `INSERT INTO MealWindow (meal_type, start_time, serving_start_time, end_time, is_active, is_full_day)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [w.meal_type, w.start_time, w.serving_start_time, w.end_time, w.is_active ? 1 : 0, w.is_full_day ? 1 : 0]
+          `INSERT INTO MealWindow (meal_type, category_name, start_time, serving_start_time, end_time, is_active, is_full_day)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE is_active = VALUES(is_active), is_full_day = VALUES(is_full_day)`,
+          [w.meal_type, w.category_name, w.start_time, w.serving_start_time, w.end_time, w.is_active ? 1 : 0, w.is_full_day ? 1 : 0]
         );
       }
-      console.log('✅ Default Meal Windows created (Breakfast, Lunch, Snacks, Dinner).');
+      console.log('✅ Default Meal Windows / Categories created (Grains & Pulses, Breakfast, Lunch, Snacks, Dinner).');
     } else {
       console.log('ℹ️ Meal Windows already exist — preserving database settings.');
     }
 
     // 3. Seed Menu Items
     const sampleItems = [
+      // Grains & Pulses
+      {
+        name: 'Basmati Rice',
+        category: 'Grains & Pulses',
+        meal_type: 'grains_pulses',
+        price: 120,
+        image_url: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80',
+        description: 'Premium-quality basmati rice, ideal for biryani and everyday meals.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_basmati_500g', name: '500 g', quantity: 0.5, price: 60 },
+          { id: 'opt_basmati_1kg',  name: '1 kg',  quantity: 1,   price: 120 },
+          { id: 'opt_basmati_2kg',  name: '2 kg',  quantity: 2,   price: 240 },
+          { id: 'opt_basmati_5kg',  name: '5 kg',  quantity: 5,   price: 600 },
+        ],
+      },
+      {
+        name: 'Toor Dal',
+        category: 'Grains & Pulses',
+        meal_type: 'grains_pulses',
+        price: 150,
+        image_url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80',
+        description: 'Fresh and nutritious toor dal, perfect for traditional Indian dal.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_toordal_500g', name: '500 g', quantity: 0.5, price: 75 },
+          { id: 'opt_toordal_1kg',  name: '1 kg',  quantity: 1,   price: 150 },
+          { id: 'opt_toordal_2kg',  name: '2 kg',  quantity: 2,   price: 300 },
+          { id: 'opt_toordal_5kg',  name: '5 kg',  quantity: 5,   price: 750 },
+        ],
+      },
+      {
+        name: 'Moong Dal',
+        category: 'Grains & Pulses',
+        meal_type: 'grains_pulses',
+        price: 130,
+        image_url: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=600&q=80',
+        description: 'High-quality moong dal, rich in protein and easy to digest.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_moongdal_500g', name: '500 g', quantity: 0.5, price: 65 },
+          { id: 'opt_moongdal_1kg',  name: '1 kg',  quantity: 1,   price: 130 },
+          { id: 'opt_moongdal_2kg',  name: '2 kg',  quantity: 2,   price: 260 },
+          { id: 'opt_moongdal_5kg',  name: '5 kg',  quantity: 5,   price: 650 },
+        ],
+      },
+      {
+        name: 'Wheat (Gahu)',
+        category: 'Grains & Pulses',
+        meal_type: 'grains_pulses',
+        price: 45,
+        image_url: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=600&q=80',
+        description: 'Fresh whole wheat grains suitable for making nutritious flour.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_wheat_500g', name: '500 g', quantity: 0.5, price: 22.5 },
+          { id: 'opt_wheat_1kg',  name: '1 kg',  quantity: 1,   price: 45 },
+          { id: 'opt_wheat_2kg',  name: '2 kg',  quantity: 2,   price: 90 },
+          { id: 'opt_wheat_5kg',  name: '5 kg',  quantity: 5,   price: 225 },
+        ],
+      },
+      {
+        name: 'Chana Dal',
+        category: 'Grains & Pulses',
+        meal_type: 'grains_pulses',
+        price: 90,
+        image_url: 'https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?auto=format&fit=crop&w=600&q=80',
+        description: 'Premium chana dal, ideal for everyday Indian cooking.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_chanadal_500g', name: '500 g', quantity: 0.5, price: 45 },
+          { id: 'opt_chanadal_1kg',  name: '1 kg',  quantity: 1,   price: 90 },
+          { id: 'opt_chanadal_2kg',  name: '2 kg',  quantity: 2,   price: 180 },
+          { id: 'opt_chanadal_5kg',  name: '5 kg',  quantity: 5,   price: 450 },
+        ],
+      },
+      // Cooking Essentials
+      {
+        name: 'Sunflower Oil',
+        category: 'Cooking Essentials',
+        meal_type: 'cooking_essential',
+        price: 150,
+        image_url: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80',
+        description: 'Refined sunflower oil suitable for everyday cooking, frying, and preparing delicious meals.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_sunfloweroil_500ml', name: '500 ml', quantity: 0.5, price: 75 },
+          { id: 'opt_sunfloweroil_1l',     name: '1 L',    quantity: 1,   price: 150 },
+          { id: 'opt_sunfloweroil_2l',     name: '2 L',    quantity: 2,   price: 300 },
+          { id: 'opt_sunfloweroil_5l',     name: '5 L',    quantity: 5,   price: 750 },
+        ],
+      },
+      {
+        name: 'Groundnut Oil',
+        category: 'Cooking Essentials',
+        meal_type: 'cooking_essential',
+        price: 190,
+        image_url: 'https://images.unsplash.com/photo-1620706857370-e1b9770e8bb1?auto=format&fit=crop&w=600&q=80',
+        description: 'Quality groundnut oil with a rich flavor, ideal for traditional Indian cooking and frying.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_groundnutoil_500ml', name: '500 ml', quantity: 0.5, price: 95 },
+          { id: 'opt_groundnutoil_1l',     name: '1 L',    quantity: 1,   price: 190 },
+          { id: 'opt_groundnutoil_2l',     name: '2 L',    quantity: 2,   price: 380 },
+          { id: 'opt_groundnutoil_5l',     name: '5 L',    quantity: 5,   price: 950 },
+        ],
+      },
+      {
+        name: 'Sugar',
+        category: 'Cooking Essentials',
+        meal_type: 'cooking_essential',
+        price: 45,
+        image_url: 'https://images.unsplash.com/photo-1581441363689-1f3c3c414635?auto=format&fit=crop&w=600&q=80',
+        description: 'Fine-quality white sugar, perfect for preparing tea, coffee, sweets, desserts, and everyday recipes.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_sugar_500g', name: '500 g', quantity: 0.5, price: 22.5 },
+          { id: 'opt_sugar_1kg',  name: '1 kg',  quantity: 1,   price: 45 },
+          { id: 'opt_sugar_2kg',  name: '2 kg',  quantity: 2,   price: 90 },
+          { id: 'opt_sugar_5kg',  name: '5 kg',  quantity: 5,   price: 225 },
+        ],
+      },
+      {
+        name: 'Iodized Salt',
+        category: 'Cooking Essentials',
+        meal_type: 'cooking_essential',
+        price: 25,
+        image_url: 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?auto=format&fit=crop&w=600&q=80',
+        description: 'Fine-quality iodized salt, an essential ingredient for everyday cooking and seasoning.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_salt_500g', name: '500 g', quantity: 0.5, price: 12.5 },
+          { id: 'opt_salt_1kg',  name: '1 kg',  quantity: 1,   price: 25 },
+          { id: 'opt_salt_2kg',  name: '2 kg',  quantity: 2,   price: 50 },
+          { id: 'opt_salt_5kg',  name: '5 kg',  quantity: 5,   price: 125 },
+        ],
+      },
+      {
+        name: 'Jaggery (Gul)',
+        category: 'Cooking Essentials',
+        meal_type: 'cooking_essential',
+        price: 65,
+        image_url: 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&w=600&q=80',
+        description: 'Traditional jaggery made from sugarcane, offering a rich natural sweetness for Indian sweets and everyday cooking.',
+        is_active: true,
+        has_variants: true,
+        variants: [
+          { id: 'opt_jaggery_500g', name: '500 g', quantity: 0.5, price: 32.5 },
+          { id: 'opt_jaggery_1kg',  name: '1 kg',  quantity: 1,   price: 65 },
+          { id: 'opt_jaggery_2kg',  name: '2 kg',  quantity: 2,   price: 130 },
+          { id: 'opt_jaggery_5kg',  name: '5 kg',  quantity: 5,   price: 325 },
+        ],
+      },
       // Breakfast
       {
         name: 'Masala Dosa with Sambhar & Chutneys',
@@ -190,9 +354,18 @@ const seedData = async () => {
     // Seed new menu items
     for (const item of sampleItems) {
       await pool.execute(
-        `INSERT INTO MenuItem (name, meal_type, price, image_url, description, is_active)
-         VALUES (?, ?, ?, ?, ?, 1)`,
-        [item.name, item.meal_type, item.price, item.image_url, item.description]
+        `INSERT INTO MenuItem (name, category, meal_type, price, image_url, description, is_active, has_variants, variants)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        [
+          item.name,
+          item.category || item.meal_type,
+          item.meal_type,
+          item.price,
+          item.image_url,
+          item.description,
+          item.has_variants ? 1 : 0,
+          item.variants ? JSON.stringify(item.variants) : null,
+        ]
       );
     }
     console.log(`✅ Seeded ${sampleItems.length} menu items successfully.`);

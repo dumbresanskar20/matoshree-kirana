@@ -1,0 +1,8 @@
+# Primary API & Socket URLs (Connected to the env database via Render Backend)
+VITE_API_URL=/api
+VITE_SOCKET_URL=https://matoshree-api.mealbook.in
+
+# Cloud Deployment (Render Backend & Vercel Frontend)
+VITE_RENDER_API_URL=https://matoshree-api.mealbook.in/api
+VITE_RENDER_SOCKET_URL=https://matoshree-api.mealbook.in
+VITE_VERCEL_SUPERADMIN_URL=https://matoshree-kirana-rixf.vercel.app

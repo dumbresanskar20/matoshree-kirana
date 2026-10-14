@@ -493,40 +493,37 @@ ON DUPLICATE KEY UPDATE id = id;
 -- Seed: Category (Kirana Product Categories)
 -- -------------------------------------------------------------
 INSERT INTO `Category` (`id`, `code`, `name`, `icon`, `display_order`, `is_active`, `is_full_day`) VALUES
-(1,  'groceries',        'Groceries & Staples',   '🌾', 1, 1, 1),
-(2,  'flours_grains',    'Atta, Flours & Grains', '🍞', 2, 1, 1),
-(3,  'dals_pulses',      'Dals & Pulses',         '🥣', 3, 1, 1),
-(4,  'oils_ghee',        'Edible Oils & Ghee',    '🛢️', 4, 1, 1),
-(5,  'spices_masalas',   'Spices & Masalas',      '🌶️', 5, 1, 1),
-(6,  'dairy_eggs',       'Dairy & Eggs',          '🥛', 6, 1, 1),
-(7,  'snacks_beverages', 'Snacks & Beverages',    '☕', 7, 1, 1),
-(8,  'personal_care',    'Personal Care',         '🧼', 8, 1, 1),
-(9,  'household',        'Cleaning & Household',  '🧹', 9, 1, 1),
-(10, 'daily_essentials', 'Daily Essentials',      '🛒', 10, 1, 1),
-(11, 'breakfast',        'Breakfast Essentials',  '🍳', 11, 1, 1),
-(12, 'lunch',            'Lunch Essentials',      '🍛', 12, 1, 1),
-(13, 'snacks',           'Evening Snacks',        '🍪', 13, 1, 1),
-(14, 'dinner',           'Dinner Essentials',     '🍲', 14, 1, 1)
+(1,  'grains_pulses',    'Grains & Pulses',       '🌾', 1, 1, 1),
+(2,  'groceries',        'Groceries & Staples',   '🌾', 2, 1, 1),
+(3,  'flours_grains',    'Atta, Flours & Grains', '🍞', 3, 1, 1),
+(4,  'dals_pulses',      'Dals & Pulses',         '🥣', 4, 1, 1),
+(5,  'oils_ghee',        'Edible Oils & Ghee',    '🛢️', 5, 1, 1),
+(6,  'spices_masalas',   'Spices & Masalas',      '🌶️', 6, 1, 1),
+(7,  'dairy_eggs',       'Dairy & Eggs',          '🥛', 7, 1, 1),
+(8,  'snacks_beverages', 'Snacks & Beverages',    '☕', 8, 1, 1),
+(9,  'personal_care',    'Personal Care',         '🧼', 9, 1, 1),
+(10, 'household',        'Cleaning & Household',  '🧹', 10, 1, 1),
+(11, 'daily_essentials', 'Daily Essentials',      '🛒', 11, 1, 1),
+(12, 'breakfast',        'Breakfast Essentials',  '🍳', 12, 1, 1),
+(13, 'lunch',            'Lunch Essentials',      '🍛', 13, 1, 1),
+(14, 'snacks',           'Evening Snacks',        '🍪', 14, 1, 1),
+(15, 'dinner',           'Dinner Essentials',     '🍲', 15, 1, 1)
 ON DUPLICATE KEY UPDATE name = VALUES(name), icon = VALUES(icon);
 
 -- -------------------------------------------------------------
 -- Seed: Product (Essential Kirana Starter Catalog)
 -- -------------------------------------------------------------
-INSERT INTO `Product` (`id`, `name`, `image_url`, `category`, `meal_type`, `price`, `mrp`, `unit`, `brand`, `stock_quantity`, `available_quantity`, `daily_stock_limit`, `is_available`, `in_stock`, `discount_percentage`, `is_active`, `description`) VALUES
-(1,  'Aashirvaad Superior MP Atta (10kg)', 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80', 'flours_grains', 'flours_grains', 440.00, 480.00, 'packet', 'Aashirvaad', 50.00, 50, 100, 1, 1, 8.33, 1, '100% pure whole wheat flour processed with traditional chakki process.'),
-(2,  'Fortune Sunlite Refined Sunflower Oil (1L)', 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80', 'oils_ghee', 'oils_ghee', 135.00, 160.00, 'packet', 'Fortune', 60.00, 60, 100, 1, 1, 15.62, 1, 'Light and healthy refined sunflower oil enriched with vitamins A & D.'),
-(3,  'Tata Salt Iodized (1kg)', 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?auto=format&fit=crop&w=600&q=80', 'groceries', 'groceries', 28.00, 30.00, 'packet', 'Tata', 120.00, 120, 200, 1, 1, 6.67, 1, 'Vacuum evaporated iodized salt. Desh Ka Namak.'),
-(4,  'Tata Sampann Unpolished Toor Dal (1kg)', 'https://images.unsplash.com/photo-1585994192701-f1a505c817ea?auto=format&fit=crop&w=600&q=80', 'dals_pulses', 'dals_pulses', 165.00, 185.00, 'packet', 'Tata Sampann', 40.00, 40, 100, 1, 1, 10.81, 1, 'Wholesome unpolished arhar dal rich in natural protein.'),
-(5,  'Everest Turmeric / Haldi Powder (200g)', 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=600&q=80', 'spices_masalas', 'spices_masalas', 62.00, 70.00, 'packet', 'Everest', 80.00, 80, 150, 1, 1, 11.43, 1, 'Pure and aromatic Indian turmeric ground from select Salem turmeric roots.'),
-(6,  'Amul Taaza Fresh Homogenised Toned Milk (1L)', 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80', 'dairy_eggs', 'dairy_eggs', 74.00, 76.00, 'packet', 'Amul', 90.00, 90, 150, 1, 1, 2.63, 1, 'UHT treated long life toned milk with zero preservatives.'),
-(7,  'Parle-G Original Glucose Biscuits (800g Family Pack)', 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=600&q=80', 'snacks_beverages', 'snacks_beverages', 75.00, 85.00, 'packet', 'Parle', 100.00, 100, 200, 1, 1, 11.76, 1, 'India\'s favourite glucose biscuits packed with energy and taste.'),
-(8,  'Brooke Bond Red Label Tea (500g)', 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80', 'snacks_beverages', 'snacks_beverages', 240.00, 270.00, 'packet', 'Brooke Bond', 45.00, 45, 100, 1, 1, 11.11, 1, 'Blend of leaves infused with red rich taste and refreshing aroma.'),
-(9,  'Dettol Original Liquid Handwash Refill (750ml)', 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80', 'personal_care', 'personal_care', 99.00, 119.00, 'packet', 'Dettol', 35.00, 35, 80, 1, 1, 16.81, 1, 'Antibacterial liquid hand soap refill with pine fragrance.'),
-(10, 'Surf Excel Easy Wash Detergent Powder (1kg)', 'https://images.unsplash.com/photo-1585670210693-e7fdd16b142e?auto=format&fit=crop&w=600&q=80', 'household', 'household', 140.00, 155.00, 'packet', 'Surf Excel', 50.00, 50, 100, 1, 1, 9.68, 1, 'Superior stain removal detergent powder for everyday clothes.'),
-(11, 'India Gate Premium Basmati Rice (5kg)', 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80', 'flours_grains', 'flours_grains', 420.00, 475.00, 'packet', 'India Gate', 30.00, 30, 80, 1, 1, 11.58, 1, 'Aged long grain aromatic Basmati rice for biryani and pulav.'),
-(12, 'Madhur Pure & Hygienic Sugar / Sakhar (1kg)', 'https://images.unsplash.com/photo-1581441363689-1f3c3c414635?auto=format&fit=crop&w=600&q=80', 'groceries', 'groceries', 48.00, 55.00, 'packet', 'Madhur', 80.00, 80, 150, 1, 1, 12.73, 1, 'Untouched by hand, sparkling white sulfur-free refined sugar.'),
-(13, 'Amul Pure Ghee (1L Tin)', 'https://images.unsplash.com/photo-1631451095765-2c91616fc9e6?auto=format&fit=crop&w=600&q=80', 'oils_ghee', 'oils_ghee', 590.00, 640.00, 'piece', 'Amul', 25.00, 25, 50, 1, 1, 7.81, 1, 'Traditional clarified butter made from fresh dairy milk cream.'),
-(14, 'Maggi 2-Minute Masala Instant Noodles (420g Pack of 6)', 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=600&q=80', 'snacks_beverages', 'snacks_beverages', 84.00, 96.00, 'packet', 'Nestle Maggi', 70.00, 70, 120, 1, 1, 12.50, 1, 'Classic Indian masala noodles seasoned with authentic spices.')
+INSERT INTO `Product` (`id`, `name`, `image_url`, `category`, `meal_type`, `price`, `mrp`, `unit`, `brand`, `stock_quantity`, `available_quantity`, `daily_stock_limit`, `is_available`, `in_stock`, `discount_percentage`, `is_active`, `has_variants`, `variants`, `description`) VALUES
+(1,  'Basmati Rice', 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80', 'Grains & Pulses', 'grains_pulses', 120.00, 140.00, 'kg', 'Matoshree Select', 150.00, 150, 200, 1, 1, 0.00, 1, 1, '[{"id":"opt_basmati_500g","name":"500 g","quantity":0.5,"price":60},{"id":"opt_basmati_1kg","name":"1 kg","quantity":1,"price":120},{"id":"opt_basmati_2kg","name":"2 kg","quantity":2,"price":240},{"id":"opt_basmati_5kg","name":"5 kg","quantity":5,"price":600}]', 'Premium-quality basmati rice, ideal for biryani and everyday meals.'),
+(2,  'Toor Dal', 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80', 'Grains & Pulses', 'grains_pulses', 150.00, 175.00, 'kg', 'Matoshree Select', 120.00, 120, 150, 1, 1, 0.00, 1, 1, '[{"id":"opt_toordal_500g","name":"500 g","quantity":0.5,"price":75},{"id":"opt_toordal_1kg","name":"1 kg","quantity":1,"price":150},{"id":"opt_toordal_2kg","name":"2 kg","quantity":2,"price":300},{"id":"opt_toordal_5kg","name":"5 kg","quantity":5,"price":750}]', 'Fresh and nutritious toor dal, perfect for traditional Indian dal.'),
+(3,  'Moong Dal', 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=600&q=80', 'Grains & Pulses', 'grains_pulses', 130.00, 155.00, 'kg', 'Matoshree Select', 100.00, 100, 150, 1, 1, 0.00, 1, 1, '[{"id":"opt_moongdal_500g","name":"500 g","quantity":0.5,"price":65},{"id":"opt_moongdal_1kg","name":"1 kg","quantity":1,"price":130},{"id":"opt_moongdal_2kg","name":"2 kg","quantity":2,"price":260},{"id":"opt_moongdal_5kg","name":"5 kg","quantity":5,"price":650}]', 'High-quality moong dal, rich in protein and easy to digest.'),
+(4,  'Wheat (Gahu)', 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=600&q=80', 'Grains & Pulses', 'grains_pulses', 45.00, 52.00, 'kg', 'Matoshree Farm Fresh', 250.00, 250, 300, 1, 1, 0.00, 1, 1, '[{"id":"opt_wheat_500g","name":"500 g","quantity":0.5,"price":22.5},{"id":"opt_wheat_1kg","name":"1 kg","quantity":1,"price":45},{"id":"opt_wheat_2kg","name":"2 kg","quantity":2,"price":90},{"id":"opt_wheat_5kg","name":"5 kg","quantity":5,"price":225}]', 'Fresh whole wheat grains suitable for making nutritious flour.'),
+(5,  'Chana Dal', 'https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?auto=format&fit=crop&w=600&q=80', 'Grains & Pulses', 'grains_pulses', 90.00, 105.00, 'kg', 'Matoshree Select', 100.00, 100, 150, 1, 1, 0.00, 1, 1, '[{"id":"opt_chanadal_500g","name":"500 g","quantity":0.5,"price":45},{"id":"opt_chanadal_1kg","name":"1 kg","quantity":1,"price":90},{"id":"opt_chanadal_2kg","name":"2 kg","quantity":2,"price":180},{"id":"opt_chanadal_5kg","name":"5 kg","quantity":5,"price":450}]', 'Premium chana dal, ideal for everyday Indian cooking.'),
+(6,  'Fortune Sunlite Refined Sunflower Oil (1L)', 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80', 'oils_ghee', 'oils_ghee', 135.00, 160.00, 'packet', 'Fortune', 60.00, 60, 100, 1, 1, 15.62, 1, 0, NULL, 'Light and healthy refined sunflower oil enriched with vitamins A & D.'),
+(7,  'Tata Salt Iodized (1kg)', 'https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?auto=format&fit=crop&w=600&q=80', 'groceries', 'groceries', 28.00, 30.00, 'packet', 'Tata', 120.00, 120, 200, 1, 1, 6.67, 1, 0, NULL, 'Vacuum evaporated iodized salt. Desh Ka Namak.'),
+(8,  'Amul Taaza Fresh Homogenised Toned Milk (1L)', 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80', 'dairy_eggs', 'dairy_eggs', 74.00, 76.00, 'packet', 'Amul', 90.00, 90, 150, 1, 1, 2.63, 1, 0, NULL, 'UHT treated long life toned milk with zero preservatives.'),
+(9,  'Parle-G Original Glucose Biscuits (800g Family Pack)', 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=600&q=80', 'snacks_beverages', 'snacks_beverages', 75.00, 85.00, 'packet', 'Parle', 100.00, 100, 200, 1, 1, 11.76, 1, 0, NULL, 'India\'s favourite glucose biscuits packed with energy and taste.'),
+(10, 'Brooke Bond Red Label Tea (500g)', 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80', 'snacks_beverages', 'snacks_beverages', 240.00, 270.00, 'packet', 'Brooke Bond', 45.00, 45, 100, 1, 1, 11.11, 1, 0, NULL, 'Blend of leaves infused with red rich taste and refreshing aroma.')
 ON DUPLICATE KEY UPDATE name = VALUES(name), price = VALUES(price);
 
 -- =============================================================

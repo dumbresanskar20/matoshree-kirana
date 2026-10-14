@@ -3,6 +3,7 @@ import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Upload, AlertCircle,
 import api from '../services/api';
 import CachedImage from './CachedImage';
 import { preloadImages } from '../utils/imageCache';
+import { createAdminSocketClient } from '../services/socket';
 
 export default function MenuManagement() {
   const [items, setItems] = useState([]);
@@ -59,12 +60,44 @@ export default function MenuManagement() {
     return [];
   };
 
+  const formatCategoryName = (name) => {
+    if (!name) return '';
+    const lower = name.toLowerCase().trim();
+    if (lower === 'grains_pulses' || lower === 'grains & pulses') return 'Grains & Pulses';
+    if (lower === 'cooking_essential' || lower === 'cooking_essentials' || lower === 'cooking essentials') return 'Cooking Essentials';
+    return name.replace(/_/g, ' ');
+  };
+
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     fetchMenuItems();
     fetchInventoryItems();
     fetchMealTypes();
+
+    const token = localStorage.getItem('token');
+    let socket = null;
+    if (token) {
+      try {
+        socket = createAdminSocketClient(token);
+        socket.on('menu:stock_updated', () => {
+          fetchMenuItems();
+          fetchInventoryItems();
+        });
+        socket.on('inventory:stock_updated', () => {
+          fetchMenuItems();
+          fetchInventoryItems();
+        });
+      } catch (e) {
+        console.error('Socket init error in MenuManagement:', e);
+      }
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
   }, [filterMeal]);
 
   const fetchMealTypes = async () => {
@@ -541,7 +574,7 @@ export default function MenuManagement() {
               onClick={() => setFilterMeal(m)}
               className="pl-3.5 pr-1.5 py-2 cursor-pointer focus:outline-none"
             >
-              {m}
+              {formatCategoryName(m)}
             </button>
             <button
               type="button"
@@ -597,7 +630,7 @@ export default function MenuManagement() {
 
                     {/* Meal Type Badge */}
                     <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-xs text-white text-[11px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-xs">
-                      {item.meal_type}
+                      {item.category_name || formatCategoryName(item.meal_type)}
                     </div>
 
                     {/* Inactive Overlay Pill */}
@@ -1060,7 +1093,7 @@ export default function MenuManagement() {
                   >
                     {mealTypes.map((t) => (
                       <option key={t} value={t} className="capitalize">
-                        {t}
+                        {formatCategoryName(t)}
                       </option>
                     ))}
                     <option value="__create_new__" className="text-emerald-700 font-bold">

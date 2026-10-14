@@ -20,6 +20,62 @@ const shapeLog = (log) => {
   };
 };
 
+const normalizeInventoryUnit = (u) => {
+  if (!u) return 'piece';
+  const clean = String(u).toLowerCase().trim();
+  if (['kg', 'kilo', 'kilogram', 'kgs'].includes(clean)) return 'kg';
+  if (['g', 'gm', 'gram', 'grams', 'gms'].includes(clean)) return 'g';
+  if (['l', 'litre', 'liter', 'litres', 'liters'].includes(clean)) return 'litre';
+  if (['ml', 'millilitre', 'milliliter'].includes(clean)) return 'ml';
+  if (['packet', 'pkt', 'packets', 'pack', 'packs'].includes(clean)) return 'packet';
+  return 'piece';
+};
+
+const normalizeInventoryCategory = (cat) => {
+  if (!cat) return 'other';
+  const c = String(cat).toLowerCase().trim();
+  if (c.includes('grain') || c.includes('pulse') || c.includes('flour') || c.includes('dal') || c.includes('atta') || c.includes('rice')) return 'grains_pulses';
+  if (c.includes('oil') || c.includes('ghee') || c.includes('spice') || c.includes('masala')) return 'oil_spices';
+  if (c.includes('dairy') || c.includes('milk') || c.includes('egg') || c.includes('protein')) return 'dairy_proteins';
+  if (c.includes('snack') || c.includes('biscuit') || c.includes('namkeen')) return 'snack_essentials';
+  if (c.includes('beverage') || c.includes('tea') || c.includes('coffee') || c.includes('drink')) return 'beverages';
+  if (c.includes('vegetable') || c.includes('fruit')) return 'vegetables';
+  return 'other';
+};
+
+let catalogSyncedOnce = false;
+const ensureCatalogSyncedWithInventory = async () => {
+  if (catalogSyncedOnce) return;
+  try {
+    const [products] = await pool.query('SELECT * FROM Product WHERE is_active = 1');
+    const [invItems] = await pool.query('SELECT id, name FROM InventoryItem');
+    const existingNames = new Set(invItems.map((i) => i.name.toLowerCase().trim()));
+
+    for (const prod of products) {
+      if (!existingNames.has(prod.name.toLowerCase().trim())) {
+        const [maxRows] = await pool.query(
+          "SELECT MAX(CAST(SUBSTRING(unique_inventory_id, 5) AS UNSIGNED)) AS max_id FROM InventoryItem WHERE unique_inventory_id LIKE 'INV-%'"
+        );
+        const nextNum = (maxRows[0]?.max_id || 0) + 1;
+        const uniqueId = `INV-${String(nextNum).padStart(4, '0')}`;
+        const unit = normalizeInventoryUnit(prod.unit);
+        const category = normalizeInventoryCategory(prod.category);
+        const stock = Number(prod.stock_quantity !== undefined ? prod.stock_quantity : (prod.available_quantity || 100));
+
+        await pool.query(
+          `INSERT INTO InventoryItem (unique_inventory_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
+           VALUES (?, ?, ?, ?, 5.000, ?, 1)`,
+          [uniqueId, prod.name.trim(), unit, stock, category]
+        );
+        existingNames.add(prod.name.toLowerCase().trim());
+      }
+    }
+    catalogSyncedOnce = true;
+  } catch (err) {
+    console.warn('[Inventory] ensureCatalogSyncedWithInventory notice:', err.message);
+  }
+};
+
 // 1. Create Inventory Item
 const createInventoryItem = async (req, res) => {
   try {
@@ -142,6 +198,7 @@ const createInventoryItem = async (req, res) => {
 // 2. List Inventory Items (Paginated & Searchable)
 const listInventoryItems = async (req, res) => {
   try {
+    await ensureCatalogSyncedWithInventory();
     const { search, is_active, page = 1, limit = 10 } = req.query;
 
     const pageNum = parseInt(page, 10);
@@ -402,6 +459,7 @@ const getInventoryItemLogs = async (req, res) => {
 // 7. Get Inventory Dashboard Summary (Alerts + Stats + Recent Logs)
 const getInventoryDashboardSummary = async (req, res) => {
   try {
+    await ensureCatalogSyncedWithInventory();
     const [totalResult] = await pool.query('SELECT COUNT(*) AS total FROM InventoryItem');
     const totalItems = totalResult[0].total;
 
@@ -493,10 +551,12 @@ const getMenuStock = async (req, res) => {
   try {
     const trackingEnabled = await isMenuStockTrackingEnabled();
     const [menuRows] = await pool.query(
-      `SELECT id, name, meal_type, price, image_url, is_active, 
+      `SELECT id, name, meal_type, price, image_url, is_active, unit,
+              COALESCE(stock_quantity, available_quantity, 100) AS stock_quantity,
               COALESCE(is_available, 1) AS is_available,
               COALESCE(available_quantity, 100) AS available_quantity,
-              COALESCE(daily_stock_limit, 100) AS daily_stock_limit
+              COALESCE(daily_stock_limit, 100) AS daily_stock_limit,
+              has_variants, variants
        FROM \`MenuItem\`
        WHERE is_active = 1
        ORDER BY meal_type ASC, name ASC`
@@ -510,6 +570,8 @@ const getMenuStock = async (req, res) => {
         ...item,
         category: item.meal_type,
         meal_type: item.meal_type,
+        unit: item.unit || 'piece',
+        stock_quantity: Number(item.stock_quantity),
         is_available: Boolean(item.is_available),
         available_quantity: Number(item.available_quantity),
         daily_stock_limit: Number(item.daily_stock_limit),
@@ -590,9 +652,9 @@ const updateMenuItemStock = async (req, res) => {
 
     await pool.query(
       `UPDATE \`MenuItem\` 
-       SET available_quantity = ?, daily_stock_limit = ?, is_available = ?
+       SET available_quantity = ?, stock_quantity = ?, daily_stock_limit = ?, is_available = ?
        WHERE id = ?`,
-      [newQty, newLimit, newAvail, id]
+      [newQty, newQty, newLimit, newAvail, id]
     );
 
     const [updated] = await pool.query('SELECT * FROM `MenuItem` WHERE id = ? LIMIT 1', [id]);

@@ -152,6 +152,7 @@ const mapMenuItem = (record, req, trackingEnabled = false) => {
     price: Number(record.price),
     mrp: record.mrp ? Number(record.mrp) : Number(record.price),
     category: record.category || record.meal_type,
+    category_name: record.category_name || (record.category === 'grains_pulses' || record.meal_type === 'grains_pulses' ? 'Grains & Pulses' : record.category || record.meal_type),
     unit: record.unit || 'piece',
     brand: record.brand || null,
     barcode: record.barcode || null,
@@ -159,7 +160,12 @@ const mapMenuItem = (record, req, trackingEnabled = false) => {
     in_stock: isInStock,
     discount_percentage: Number(record.discount_percentage || 0),
     has_variants: hasVariants,
-    variants: Array.isArray(parsedVariants) ? parsedVariants : [],
+    variants: Array.isArray(parsedVariants)
+      ? parsedVariants.map((v) => ({
+          ...v,
+          price: Number(v.price),
+        }))
+      : [],
     available_quantity: availableQty,
     daily_stock_limit: Number(record.daily_stock_limit || 100),
     track_stock: Boolean(trackingEnabled),
@@ -275,7 +281,11 @@ const getMenuItems = async (req, res) => {
       }
 
       let itemsSql = 'SELECT * FROM MenuItem WHERE (meal_type = ? OR category = ?)';
-      const itemsParams = [targetType, targetType];
+      let itemsParams = [targetType, targetType];
+      if (targetType === 'cooking_essential' || targetType === 'cooking_essentials' || targetType === 'cooking essentials') {
+        itemsSql = 'SELECT * FROM MenuItem WHERE (meal_type IN (?, ?) OR category IN (?, ?, ?))';
+        itemsParams = ['cooking_essential', 'cooking_essentials', 'cooking_essential', 'cooking_essentials', 'Cooking Essentials'];
+      }
       if (isStudentFetch) {
         itemsSql += ' AND is_active = 1';
       }
@@ -1093,8 +1103,7 @@ const getMealWindows = async (req, res) => {
 const updateMealWindow = async (req, res) => {
   try {
     await ensureMealWindowTable();
-    const { meal_type } = req.params;
-    const { start_time, end_time, serving_start_time, custom_note, is_active, is_full_day } = req.body;
+    const { start_time, end_time, serving_start_time, custom_note, is_active, is_full_day, category_name, icon } = req.body;
 
     const updateData = {};
     if (start_time !== undefined) updateData.start_time = start_time;
@@ -1103,6 +1112,8 @@ const updateMealWindow = async (req, res) => {
     if (custom_note !== undefined) updateData.custom_note = custom_note;
     if (is_active !== undefined) updateData.is_active = is_active === true || is_active === 'true' ? 1 : 0;
     if (is_full_day !== undefined) updateData.is_full_day = is_full_day === true || is_full_day === 'true' ? 1 : 0;
+    if (category_name !== undefined) updateData.category_name = category_name;
+    if (icon !== undefined) updateData.icon = icon;
 
     const cleanMealType = meal_type.toLowerCase();
 

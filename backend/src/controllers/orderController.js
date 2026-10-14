@@ -206,78 +206,331 @@ const fetchOrderWithDetails = async (idOrRazorpayId, isDbId = true) => {
   };
 };
 
-// Helper: Atomically deduct inventory ingredients and log deductions for a confirmed/paid order
-const deductInventoryForOrder = async (connection, orderId) => {
-  const [orderItems] = await connection.execute(
-    'SELECT * FROM OrderItem WHERE order_id = ?',
-    [orderId]
-  );
+// -------------------------------------------------------------
+// Kirana Store Inventory Deduction & Restoration Helpers
+// -------------------------------------------------------------
 
-  const inventoryDeductions = {};
+/**
+ * Normalizes units to match the InventoryItem unit ENUM ('kg', 'g', 'litre', 'ml', 'piece', 'packet')
+ */
+const normalizeInventoryUnit = (u) => {
+  if (!u) return 'piece';
+  const clean = String(u).toLowerCase().trim();
+  if (['kg', 'kilo', 'kilogram', 'kgs'].includes(clean)) return 'kg';
+  if (['g', 'gm', 'gram', 'grams', 'gms'].includes(clean)) return 'g';
+  if (['l', 'litre', 'liter', 'litres', 'liters'].includes(clean)) return 'litre';
+  if (['ml', 'millilitre', 'milliliter'].includes(clean)) return 'ml';
+  if (['packet', 'pkt', 'packets', 'pack', 'packs'].includes(clean)) return 'packet';
+  return 'piece';
+};
 
-  for (const item of orderItems) {
-    if (!item.menu_item_id) continue;
+/**
+ * Normalizes categories for inventory categorization
+ */
+const normalizeInventoryCategory = (cat) => {
+  if (!cat) return 'other';
+  const c = String(cat).toLowerCase().trim();
+  if (c.includes('grain') || c.includes('pulse') || c.includes('flour') || c.includes('dal') || c.includes('atta') || c.includes('rice')) return 'grains_pulses';
+  if (c.includes('oil') || c.includes('ghee') || c.includes('spice') || c.includes('masala')) return 'oil_spices';
+  if (c.includes('dairy') || c.includes('milk') || c.includes('egg') || c.includes('protein')) return 'dairy_proteins';
+  if (c.includes('snack') || c.includes('biscuit') || c.includes('namkeen')) return 'snack_essentials';
+  if (c.includes('beverage') || c.includes('tea') || c.includes('coffee') || c.includes('drink')) return 'beverages';
+  if (c.includes('vegetable') || c.includes('fruit')) return 'vegetables';
+  return 'other';
+};
 
-    let recipeItems = [];
+/**
+ * Strips variant descriptions like "(1 kg)" or "(500 g)" to get the raw product name
+ */
+const cleanBaseItemName = (name) => {
+  if (!name) return '';
+  return name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+};
+
+/**
+ * Computes exact deduction quantity based on orderItem quantity and variant configuration
+ * e.g., 1 pack of 1 kg basmati rice -> 1 kg
+ *       2 packs of 500 g basmati rice -> 1 kg
+ *       1 pack of 5 kg basmati rice -> 5 kg
+ */
+const calculateOrderItemDeductQuantity = (orderItem, product) => {
+  const orderedCount = Math.max(1, Number(orderItem.quantity) || 1);
+  const variantName = (orderItem.variant_name || '').trim();
+  const itemName = (orderItem.item_name || '').trim();
+  const productUnit = normalizeInventoryUnit(product?.unit);
+
+  let variantMultiplier = 1;
+
+  // 1. Try matching product.variants JSON if available
+  let parsedVariants = [];
+  if (product && product.variants) {
     try {
-      const [rows] = await connection.execute(
-        `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit 
-         FROM RecipeItem ri
-         INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
-         WHERE ri.menu_item_id = ?`,
-        [item.menu_item_id]
-      );
-      recipeItems = rows;
+      parsedVariants = typeof product.variants === 'string' ? JSON.parse(product.variants) : product.variants;
     } catch (_) {
-      recipeItems = [];
+      parsedVariants = [];
     }
+  }
 
-    for (const ri of recipeItems) {
-      const convertedRequired = convertToInventoryBaseUnit(
-        Number(ri.quantity_required),
-        ri.quantity_unit || ri.inventory_item_unit,
-        ri.inventory_item_unit
+  if (Array.isArray(parsedVariants) && parsedVariants.length > 0) {
+    const matched = parsedVariants.find((v) => {
+      if (!v) return false;
+      const vName = String(v.name || '').toLowerCase().trim();
+      const targetName = variantName.toLowerCase();
+      return (
+        (targetName && (vName === targetName || vName.includes(targetName) || targetName.includes(vName))) ||
+        (v.id && String(v.id).toLowerCase() === String(orderItem.variant_id || '').toLowerCase()) ||
+        (itemName && itemName.toLowerCase().includes(vName))
       );
-      const needed = convertedRequired * item.quantity;
-      const itemId = ri.inventory_item_id;
-      if (!inventoryDeductions[itemId]) {
-        inventoryDeductions[itemId] = {
-          needed: 0,
-          name: ri.inventory_item_name,
-          unit: ri.inventory_item_unit,
-        };
-      }
-      inventoryDeductions[itemId].needed += needed;
+    });
+
+    if (matched && matched.quantity !== undefined && !isNaN(Number(matched.quantity))) {
+      return Number(matched.quantity) * orderedCount;
     }
   }
 
-  // Lock and deduct inventory levels in sorted order to avoid deadlocks
-  const sortedItemIds = Object.keys(inventoryDeductions).map(Number).sort((a, b) => a - b);
+  // 2. Parse variant string (e.g. "500 g", "1 kg", "2 kg", "5 kg", "500 ml", "1 L", "2 L", "800g")
+  const textToScan = `${variantName} ${itemName}`;
+  const match = textToScan.match(/(\d+(?:\.\d+)?)\s*(kg|kilo|g|gram|l|litre|liter|ml|piece|pc|packet|pkt)\b/i);
 
-  for (const itemId of sortedItemIds) {
-    const { needed } = inventoryDeductions[itemId];
+  if (match) {
+    const num = parseFloat(match[1]);
+    const unitFound = match[2].toLowerCase();
 
-    const [invRows] = await connection.execute(
-      'SELECT id, name, quantity_in_stock, is_active FROM InventoryItem WHERE id = ? FOR UPDATE',
-      [itemId]
-    );
-    const invItem = invRows[0];
-    if (!invItem) continue;
-
-    const currentStock = Number(invItem.quantity_in_stock);
-    const newStock = Math.max(0, currentStock - needed);
-
-    await connection.execute(
-      'UPDATE InventoryItem SET quantity_in_stock = ? WHERE id = ?',
-      [newStock, itemId]
-    );
-
-    await connection.execute(
-      `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, order_id)
-       VALUES (?, 'deduction', ?, ?)`,
-      [itemId, -needed, orderId]
-    );
+    if (!isNaN(num) && num > 0) {
+      if (productUnit === 'kg') {
+        if (['g', 'gram'].includes(unitFound)) {
+          variantMultiplier = num / 1000;
+        } else if (['kg', 'kilo'].includes(unitFound)) {
+          variantMultiplier = num;
+        }
+      } else if (productUnit === 'g') {
+        if (['kg', 'kilo'].includes(unitFound)) {
+          variantMultiplier = num * 1000;
+        } else if (['g', 'gram'].includes(unitFound)) {
+          variantMultiplier = num;
+        }
+      } else if (productUnit === 'litre') {
+        if (['ml'].includes(unitFound)) {
+          variantMultiplier = num / 1000;
+        } else if (['l', 'litre', 'liter'].includes(unitFound)) {
+          variantMultiplier = num;
+        }
+      } else if (productUnit === 'ml') {
+        if (['l', 'litre', 'liter'].includes(unitFound)) {
+          variantMultiplier = num * 1000;
+        } else if (['ml'].includes(unitFound)) {
+          variantMultiplier = num;
+        }
+      } else {
+        variantMultiplier = 1;
+      }
+    }
   }
+
+  return variantMultiplier * orderedCount;
+};
+
+/**
+ * Deducts ordered item counts from Total Inventory (both Product and InventoryItem tables)
+ * when admin delivers the order successfully.
+ */
+const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
+  try {
+    // 1. Prevent duplicate deduction if already deducted
+    const [existingLogs] = await db.query(
+      "SELECT id FROM InventoryLog WHERE order_id = ? AND action_type = 'deduction' LIMIT 1",
+      [orderId]
+    );
+    if (existingLogs && existingLogs.length > 0) {
+      console.log(`[OrderController] Order #${orderId} inventory already deducted. Skipping duplicate.`);
+      return [];
+    }
+
+    // 2. Fetch order token number
+    const [orderRows] = await db.query(
+      'SELECT id, token_number FROM `Order` WHERE id = ? LIMIT 1',
+      [orderId]
+    );
+    const tokenNumber = orderRows[0]?.token_number || `#${orderId}`;
+
+    // 3. Fetch order items
+    const [orderItems] = await db.query(
+      'SELECT * FROM OrderItem WHERE order_id = ?',
+      [orderId]
+    );
+    if (!orderItems || orderItems.length === 0) return [];
+
+    const deductionResults = [];
+
+    for (const item of orderItems) {
+      const rawProdId = item.product_id || item.menu_item_id;
+      let product = null;
+
+      if (rawProdId) {
+        const [pRows] = await db.query('SELECT * FROM Product WHERE id = ? LIMIT 1', [rawProdId]);
+        product = pRows[0] || null;
+      }
+
+      const cleanName = cleanBaseItemName(item.item_name);
+      if (!product && cleanName) {
+        const [pRows] = await db.query(
+          'SELECT * FROM Product WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
+          [cleanName]
+        );
+        product = pRows[0] || null;
+      }
+
+      const deductQty = calculateOrderItemDeductQuantity(item, product);
+      const itemName = product?.name || cleanName || item.item_name;
+
+      // A. Deduct from Product table
+      if (product) {
+        const currentStock = Number(product.stock_quantity !== undefined ? product.stock_quantity : product.available_quantity);
+        const newStock = Math.max(0, currentStock - deductQty);
+        const newAvail = Math.max(0, Math.floor(newStock));
+        const inStock = newStock > 0 ? 1 : 0;
+
+        await db.query(
+          `UPDATE Product 
+           SET stock_quantity = ?, available_quantity = ?, is_available = ?, in_stock = ?
+           WHERE id = ?`,
+          [newStock, newAvail, inStock, inStock, product.id]
+        );
+      }
+
+      // B. Deduct from InventoryItem table
+      let invItem = null;
+      const [invRows] = await db.query(
+        'SELECT * FROM InventoryItem WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
+        [itemName]
+      );
+      if (invRows.length > 0) {
+        invItem = invRows[0];
+      } else {
+        const [fuzzyRows] = await db.query(
+          'SELECT * FROM InventoryItem WHERE LOWER(?) LIKE CONCAT("%", LOWER(TRIM(name)), "%") LIMIT 1',
+          [itemName]
+        );
+        if (fuzzyRows.length > 0) {
+          invItem = fuzzyRows[0];
+        }
+      }
+
+      // Auto-register in InventoryItem if not existing yet
+      if (!invItem) {
+        const unit = normalizeInventoryUnit(product?.unit || 'piece');
+        const category = normalizeInventoryCategory(product?.category);
+        const initialStock = product ? Math.max(0, Number(product.stock_quantity || 100) - deductQty) : 0;
+
+        const [maxRows] = await db.query(
+          "SELECT MAX(CAST(SUBSTRING(unique_inventory_id, 5) AS UNSIGNED)) AS max_id FROM InventoryItem WHERE unique_inventory_id LIKE 'INV-%'"
+        );
+        const nextNum = (maxRows[0]?.max_id || 0) + 1;
+        const uniqueId = `INV-${String(nextNum).padStart(4, '0')}`;
+
+        try {
+          const [insertRes] = await db.query(
+            `INSERT INTO InventoryItem (unique_inventory_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
+             VALUES (?, ?, ?, ?, 5.000, ?, 1)`,
+            [uniqueId, itemName, unit, initialStock, category]
+          );
+          const [newInvRows] = await db.query('SELECT * FROM InventoryItem WHERE id = ?', [insertRes.insertId]);
+          invItem = newInvRows[0] || null;
+        } catch (err) {
+          console.warn('[Inventory] Auto-create InventoryItem note:', err.message);
+        }
+      } else {
+        const currentInvStock = Number(invItem.quantity_in_stock);
+        const newInvStock = Math.max(0, currentInvStock - deductQty);
+
+        await db.query(
+          'UPDATE InventoryItem SET quantity_in_stock = ? WHERE id = ?',
+          [newInvStock, invItem.id]
+        );
+        invItem.quantity_in_stock = newInvStock;
+      }
+
+      // C. Record deduction in InventoryLog
+      if (invItem) {
+        await db.query(
+          `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id, order_id, reason)
+           VALUES (?, 'deduction', ?, ?, ?, ?)`,
+          [
+            invItem.id,
+            -deductQty,
+            adminId || null,
+            orderId,
+            `Delivered Order ${tokenNumber}`
+          ]
+        );
+      }
+
+      deductionResults.push({
+        item_name: itemName,
+        deducted: deductQty,
+        unit: product?.unit || invItem?.unit || 'unit',
+        remaining_stock: invItem ? Number(invItem.quantity_in_stock) : undefined
+      });
+    }
+
+    return deductionResults;
+  } catch (err) {
+    console.error('[OrderController] Error deducting inventory on delivery:', err);
+    return [];
+  }
+};
+
+/**
+ * Restores deducted stock to both Product and InventoryItem if a delivered order is cancelled
+ */
+const restoreInventoryOnOrderCancel = async (db, orderId, adminId) => {
+  try {
+    const [logs] = await db.query(
+      "SELECT * FROM InventoryLog WHERE order_id = ? AND action_type = 'deduction'",
+      [orderId]
+    );
+    if (!logs || logs.length === 0) return;
+
+    for (const log of logs) {
+      const qtyToRestore = Math.abs(Number(log.quantity_changed));
+      if (qtyToRestore <= 0) continue;
+
+      // Restore InventoryItem
+      await db.query(
+        'UPDATE InventoryItem SET quantity_in_stock = quantity_in_stock + ? WHERE id = ?',
+        [qtyToRestore, log.inventory_item_id]
+      );
+
+      // Restore Product
+      const [invRows] = await db.query('SELECT name FROM InventoryItem WHERE id = ? LIMIT 1', [log.inventory_item_id]);
+      if (invRows.length > 0) {
+        const name = invRows[0].name;
+        await db.query(
+          `UPDATE Product 
+           SET stock_quantity = stock_quantity + ?,
+               available_quantity = available_quantity + ?,
+               is_available = 1,
+               in_stock = 1
+           WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))`,
+          [qtyToRestore, Math.ceil(qtyToRestore), name]
+        );
+      }
+
+      // Log restock action
+      await db.query(
+        `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id, order_id, reason)
+         VALUES (?, 'restock', ?, ?, ?, 'Restored on order cancellation')`,
+        [log.inventory_item_id, qtyToRestore, adminId || null, orderId]
+      );
+    }
+  } catch (err) {
+    console.error('[OrderController] Error restoring inventory on cancellation:', err);
+  }
+};
+
+// Legacy helper kept for backwards compatibility (deductions now occur when admin delivers order)
+const deductInventoryForOrder = async (connection, orderId) => {
+  return true;
 };
 
 // Create Razorpay Order (STRICT STUDENT JWT ENFORCED VIA verifyStudent MIDDLEWARE)
@@ -820,29 +1073,7 @@ const fulfillPaidOrder = async ({
       }
     }
 
-    // 4. Deduct MenuItem available portions if tracking is active
-    const menuTrackingEnabled = await isMenuStockTrackingEnabled();
-    if (menuTrackingEnabled) {
-      const [orderItems] = await connection.execute(
-        'SELECT menu_item_id, quantity FROM OrderItem WHERE order_id = ?',
-        [finalOrderId]
-      );
-      for (const it of orderItems) {
-        if (it.menu_item_id) {
-          await connection.execute(
-            `UPDATE MenuItem 
-             SET available_quantity = GREATEST(0, available_quantity - ?),
-                 is_available = CASE WHEN available_quantity - ? <= 0 THEN 0 ELSE is_available END
-             WHERE id = ?`,
-            [it.quantity, it.quantity, it.menu_item_id]
-          );
-        }
-      }
-    }
-
-    // 5. Deduct raw inventory ingredients
-    await deductInventoryForOrder(connection, finalOrderId);
-
+    // Stock inventory deduction is executed when the order is marked 'delivered' by the admin.
     await connection.commit();
   } catch (fulfillErr) {
     await connection.rollback();
@@ -1563,47 +1794,19 @@ const updateOrderStatus = async (req, res) => {
         'UPDATE `Order` SET order_status = ?, collected_at = NOW(), collected_by_admin_id = ? WHERE id = ?',
         ['delivered', req.adminId || null, targetId]
       );
+
+      // Deduct item count from Total Inventory upon successful delivery
+      if (prevStatus !== 'delivered') {
+        const deductedResults = await deductInventoryOnOrderDelivery(pool, targetId, req.adminId);
+        console.log(`[OrderController] Inventory deducted on delivery for Order #${targetId}:`, deductedResults);
+      }
     } else {
       await pool.execute('UPDATE `Order` SET order_status = ? WHERE id = ?', [order_status, targetId]);
     }
 
-    // If order was cancelled and was not previously cancelled, restore deducted ingredients and menu portions
+    // If order was cancelled and was previously delivered or deducted, restore inventory counts
     if (order_status === 'cancelled' && prevStatus !== 'cancelled') {
-      const [logs] = await pool.execute(
-        "SELECT * FROM InventoryLog WHERE order_id = ? AND action_type = 'deduction'",
-        [targetId]
-      );
-      for (const log of logs) {
-        const qtyToRestore = Math.abs(Number(log.quantity_changed));
-        await pool.execute(
-          'UPDATE InventoryItem SET quantity_in_stock = quantity_in_stock + ? WHERE id = ?',
-          [qtyToRestore, log.inventory_item_id]
-        );
-        await pool.execute(
-          "INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, order_id, admin_user_id) VALUES (?, 'restock', ?, ?, ?)",
-          [log.inventory_item_id, qtyToRestore, targetId, req.adminId || null]
-        );
-      }
-
-      // Restore prepared menu portions if tracking is enabled
-      const menuTrackingEnabled = await isMenuStockTrackingEnabled();
-      if (menuTrackingEnabled) {
-        const [orderItems] = await pool.execute(
-          'SELECT menu_item_id, quantity FROM OrderItem WHERE order_id = ?',
-          [targetId]
-        );
-        for (const it of orderItems) {
-          if (it.menu_item_id) {
-            await pool.execute(
-              `UPDATE MenuItem 
-               SET available_quantity = available_quantity + ?,
-                   is_available = CASE WHEN available_quantity + ? > 0 THEN 1 ELSE is_available END
-               WHERE id = ?`,
-              [it.quantity, it.quantity, it.menu_item_id]
-            );
-          }
-        }
-      }
+      await restoreInventoryOnOrderCancel(pool, targetId, req.adminId);
     }
 
     const order = await fetchOrderWithDetails(targetId, true);
@@ -1617,8 +1820,9 @@ const updateOrderStatus = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      if (order_status === 'cancelled' && prevStatus !== 'cancelled') {
-        io.emit('menu:stock_updated', { restored_order_id: targetId });
+      if (order_status === 'delivered' || (order_status === 'cancelled' && prevStatus !== 'cancelled')) {
+        io.emit('inventory:stock_updated', { order_id: targetId, status: order_status });
+        io.emit('menu:stock_updated', { order_id: targetId, status: order_status });
       }
 
       const updatePayload = {
@@ -2446,23 +2650,7 @@ const createManualOrder = async (req, res) => {
         );
       }
 
-      // Deduct prepared menu portions if tracking is enabled
-      const manualTrackingOn = await isMenuStockTrackingEnabled();
-      if (manualTrackingOn) {
-        for (const it of validatedItems) {
-          await connection.execute(
-            `UPDATE MenuItem 
-             SET available_quantity = GREATEST(0, available_quantity - ?),
-                 is_available = CASE WHEN available_quantity - ? <= 0 THEN 0 ELSE is_available END
-             WHERE id = ?`,
-            [it.quantity, it.quantity, it.menu_item_id]
-          );
-        }
-      }
-
-      // Deduct inventory ingredients and log
-      await deductInventoryForOrder(connection, finalOrderId);
-
+      // Stock inventory deduction will execute when this order is marked 'delivered' by the admin.
       await connection.commit();
     } catch (txErr) {
       await connection.rollback();

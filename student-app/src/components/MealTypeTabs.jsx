@@ -32,6 +32,12 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
   }, [selectedMealType]);
 
   const MEAL_CONFIG = {
+    grains_pulses: { label: 'Grains & Pulses', icon: '🌾' },
+    'grains & pulses': { label: 'Grains & Pulses', icon: '🌾' },
+    cooking_essential: { label: 'Cooking Essentials', icon: '🍳' },
+    'cooking essential': { label: 'Cooking Essentials', icon: '🍳' },
+    cooking_essentials: { label: 'Cooking Essentials', icon: '🍳' },
+    'cooking essentials': { label: 'Cooking Essentials', icon: '🍳' },
     groceries: { label: 'Groceries & Staples', icon: '🌾' },
     flours_grains: { label: 'Atta & Flours', icon: '🍞' },
     dals_pulses: { label: 'Dals & Pulses', icon: '🥣' },
@@ -50,11 +56,17 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
 
   const getMealMeta = (rawType, windowItem = null) => {
     const type = (rawType || '').toLowerCase().trim();
-    if (windowItem && windowItem.category_name) {
-      return { label: windowItem.category_name, icon: windowItem.icon || MEAL_CONFIG[type]?.icon || '🛒' };
-    }
     if (MEAL_CONFIG[type]) {
       return MEAL_CONFIG[type];
+    }
+    if (windowItem && windowItem.category_name && windowItem.category_name.toLowerCase() !== type) {
+      return { label: windowItem.category_name, icon: windowItem.icon || MEAL_CONFIG[type]?.icon || '🛒' };
+    }
+    if (type === 'grains_pulses' || type === 'grains & pulses') {
+      return { label: 'Grains & Pulses', icon: '🌾' };
+    }
+    if (type === 'cooking_essential' || type === 'cooking_essentials' || type === 'cooking essentials') {
+      return { label: 'Cooking Essentials', icon: '🍳' };
     }
 
     // Clean formatted label: e.g. milk_shake -> Milk Shake
