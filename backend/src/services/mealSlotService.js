@@ -257,7 +257,7 @@ const validateSlotPayload = (slot, slotNumber = 1) => {
   };
 };
 
-const DEFAULT_MEAL_TYPES = [];
+const DEFAULT_MEAL_TYPES = ['store_hours'];
 
 /**
  * Get all meal slots grouped by meal_type
@@ -356,13 +356,139 @@ const getMealSlotsForType = async (mealType) => {
 };
 
 /**
+ * Get unified store operating hours & timings for Matoshree Kirana
+ */
+const getStoreTiming = async () => {
+  // 1. Check 'store_hours'
+  const storeEvaluation = await getMealSlotsForType('store_hours');
+  const hasConfiguredSlots = storeEvaluation.slots && storeEvaluation.slots.some((s) => s.start_datetime || s.is_active);
+  if (storeEvaluation.is_full_day || hasConfiguredSlots || storeEvaluation.custom_note) {
+    return storeEvaluation;
+  }
+
+  // 2. Check if any category has configured slots or windows to inherit
+  const allSlots = await getAllMealSlots();
+  const configured = Object.values(allSlots).find(
+    (ev) => ev.is_full_day || (ev.slots && ev.slots.some((s) => s.start_datetime || s.is_active)) || ev.custom_note
+  );
+  if (configured) {
+    return {
+      ...configured,
+      meal_type: 'store_hours',
+    };
+  }
+
+  // 3. Fallback to MealWindow or default
+  return storeEvaluation;
+};
+
+/**
+ * Save unified store timing and synchronize across all categories
+ */
+const saveStoreTiming = async (slot1Data, slot2Data, options = {}) => {
+  const customNote = options.custom_note || options.serving_note || null;
+  const isFullDay = Boolean(options.is_full_day === true || options.is_full_day === 1 || options.is_full_day === 'true');
+
+  const validated1 = validateSlotPayload(slot1Data || {}, 1);
+  const validated2 = validateSlotPayload(slot2Data || {}, 2);
+
+  if (customNote) {
+    validated1.note = customNote;
+    validated2.note = customNote;
+  }
+
+  // 1. Upsert store_hours in meal_serving_slots
+  try {
+    await pool.execute(
+      `INSERT INTO \`meal_serving_slots\` (meal_type, slot_number, start_datetime, end_datetime, is_active, note)
+       VALUES ('store_hours', 1, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         start_datetime = VALUES(start_datetime),
+         end_datetime = VALUES(end_datetime),
+         is_active = VALUES(is_active),
+         note = VALUES(note),
+         updated_at = CURRENT_TIMESTAMP`,
+      [validated1.start_datetime, validated1.end_datetime, validated1.is_active, validated1.note]
+    );
+
+    await pool.execute(
+      `INSERT INTO \`meal_serving_slots\` (meal_type, slot_number, start_datetime, end_datetime, is_active, note)
+       VALUES ('store_hours', 2, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         start_datetime = VALUES(start_datetime),
+         end_datetime = VALUES(end_datetime),
+         is_active = VALUES(is_active),
+         note = VALUES(note),
+         updated_at = CURRENT_TIMESTAMP`,
+      [validated2.start_datetime, validated2.end_datetime, validated2.is_active, validated2.note]
+    );
+  } catch (_slotsErr) {
+    // meal_serving_slots table removed for Kirana store
+  }
+
+  // 2. Synchronize to MealWindow and Category tables
+  const anyActive = isFullDay || validated1.is_active === 1 || validated2.is_active === 1;
+  let sTime = '08:00';
+  let eTime = '20:00';
+  if (validated1.start_datetime) {
+    sTime = validated1.start_datetime.substring(11, 16);
+  }
+  if (validated1.end_datetime) {
+    eTime = validated1.end_datetime.substring(11, 16);
+  }
+
+  // Update/insert store_hours in MealWindow
+  try {
+    await pool.execute(
+      `INSERT INTO \`MealWindow\` (meal_type, start_time, end_time, is_active, is_full_day, custom_note)
+       VALUES ('store_hours', ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         start_time = VALUES(start_time),
+         end_time = VALUES(end_time),
+         is_active = VALUES(is_active),
+         is_full_day = VALUES(is_full_day),
+         custom_note = VALUES(custom_note)`,
+      [sTime, eTime, anyActive ? 1 : 0, isFullDay ? 1 : 0, customNote]
+    );
+  } catch (mwErr) {
+    // Ignore
+  }
+
+  // Synchronize ALL product categories in Category table to share this store timing
+  try {
+    await pool.execute(
+      `UPDATE \`Category\` SET start_time = ?, end_time = ?, is_active = ?, is_full_day = ?, custom_note = ?`,
+      [sTime, eTime, anyActive ? 1 : 0, isFullDay ? 1 : 0, customNote]
+    );
+  } catch (_catErr) {
+    // Ignore if view or not present
+  }
+
+  // Synchronize all category rows in MealWindow as well
+  try {
+    await pool.execute(
+      `UPDATE \`MealWindow\` SET start_time = ?, end_time = ?, is_active = ?, is_full_day = ?, custom_note = ? WHERE meal_type != 'store_hours'`,
+      [sTime, eTime, anyActive ? 1 : 0, isFullDay ? 1 : 0, customNote]
+    );
+  } catch (_mwSyncErr) {
+    // Ignore
+  }
+
+  return getStoreTiming();
+};
+
+/**
  * Save Slot 1 & Slot 2 for a meal type in a single transaction
- * Options can include custom_note / serving_note to display to users
+ * If saving for store_hours or store, synchronizes to all categories.
  */
 const saveMealSlotsForType = async (mealType, slot1Data, slot2Data, options = {}) => {
   const cleanType = String(mealType || '').toLowerCase().trim();
   if (!cleanType) {
     throw new Error('Meal type is required.');
+  }
+
+  if (cleanType === 'store_hours' || cleanType === 'store') {
+    return saveStoreTiming(slot1Data, slot2Data, options);
   }
 
   const customNote = options.custom_note || options.serving_note || null;
@@ -371,7 +497,6 @@ const saveMealSlotsForType = async (mealType, slot1Data, slot2Data, options = {}
   const validated1 = validateSlotPayload(slot1Data || {}, 1);
   const validated2 = validateSlotPayload(slot2Data || {}, 2);
 
-  // If custom note provided, assign to validated note
   if (customNote) {
     validated1.note = customNote;
     validated2.note = customNote;
@@ -437,37 +562,39 @@ const saveMealSlotsForType = async (mealType, slot1Data, slot2Data, options = {}
 
 /**
  * Server-side order verification:
- * Checks whether the meal type is currently open for ordering.
- * Evaluates meal_serving_slots first, falling back to MealWindow if no slots are registered yet.
+ * Checks whether the STORE is currently open for ordering so all category products can be ordered.
+ * Evaluates unified store operating hours first.
  */
 const checkMealOrderableNow = async (mealType) => {
   const cleanType = String(mealType || '').toLowerCase().trim();
-  const slotEvaluation = await getMealSlotsForType(cleanType);
 
-  // If 24/7 ordering enabled
-  if (slotEvaluation.is_full_day) {
+  // 1. Evaluate unified Store Timing
+  const storeTiming = await getStoreTiming();
+
+  // If 24/7 store ordering is enabled
+  if (storeTiming && storeTiming.is_full_day) {
     return {
       isOrderable: true,
-      message: `24/7 Ordering is active for ${cleanType.toUpperCase()}.`,
-      evaluation: slotEvaluation,
+      message: 'Matoshree Kirana Store is open 24/7 for ordering.',
+      evaluation: storeTiming,
     };
   }
 
-  // If slots exist in meal_serving_slots
-  if (slotEvaluation.slots && slotEvaluation.slots.some((s) => s.start_datetime || s.is_active)) {
+  // If store timing has configured slots in meal_serving_slots
+  if (storeTiming && storeTiming.slots && storeTiming.slots.some((s) => s.start_datetime || s.is_active)) {
     return {
-      isOrderable: slotEvaluation.isAvailableNow,
-      message: slotEvaluation.isAvailableNow
-        ? `Ordering is open. ${slotEvaluation.serving_note}`
-        : `Ordering for ${cleanType.toUpperCase()} is currently closed. ${slotEvaluation.serving_note}`,
-      evaluation: slotEvaluation,
+      isOrderable: Boolean(storeTiming.isAvailableNow),
+      message: storeTiming.isAvailableNow
+        ? `Store ordering is open. ${storeTiming.serving_note || ''}`
+        : `Matoshree Kirana Store is currently closed for orders. ${storeTiming.serving_note || ''}`,
+      evaluation: storeTiming,
     };
   }
 
-  // Fallback to MealWindow if no slots configured
+  // 2. Fallback to MealWindow for store_hours or the specific category
   const [mwRows] = await pool.execute(
-    'SELECT * FROM `MealWindow` WHERE LOWER(meal_type) = ? LIMIT 1',
-    [cleanType]
+    'SELECT * FROM `MealWindow` WHERE LOWER(meal_type) = ? OR LOWER(meal_type) = ? ORDER BY (LOWER(meal_type) = "store_hours") DESC LIMIT 1',
+    ['store_hours', cleanType]
   );
   if (mwRows && mwRows.length > 0) {
     const mw = mwRows[0];
@@ -479,16 +606,16 @@ const checkMealOrderableNow = async (mealType) => {
     return {
       isOrderable: isOpen,
       message: isOpen
-        ? `Ordering is open until ${mw.end_time}`
-        : `Ordering for ${cleanType.toUpperCase()} is currently closed. Operating window: ${mw.start_time} - ${mw.end_time}`,
+        ? `Store ordering is open until ${mw.end_time}`
+        : `Matoshree Kirana Store is currently closed. Operating hours: ${mw.start_time} - ${mw.end_time}`,
       evaluation: null,
     };
   }
 
-  // Not found at all
+  // If no restrictive window configured, default to open
   return {
-    isOrderable: false,
-    message: `Meal category '${cleanType.toUpperCase()}' is currently unavailable.`,
+    isOrderable: true,
+    message: 'Store ordering is open.',
     evaluation: null,
   };
 };
@@ -503,6 +630,8 @@ module.exports = {
   validateSlotPayload,
   getAllMealSlots,
   getMealSlotsForType,
+  getStoreTiming,
+  saveStoreTiming,
   saveMealSlotsForType,
   checkMealOrderableNow,
 };

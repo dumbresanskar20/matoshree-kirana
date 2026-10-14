@@ -41,25 +41,25 @@ export default function MealTimingNote() {
     }
   } else if (isAvailableNow) {
     theme = 'available';
-    statusBadge = 'Serving Now';
+    statusBadge = 'Store Open';
     if (!displayNote) {
       displayNote = activeSlot?.end_datetime 
-        ? `Serving now until ${new Date(activeSlot.end_datetime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}`
-        : 'Serving now';
+        ? `Store open now until ${new Date(activeSlot.end_datetime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}`
+        : 'Store open for orders';
     }
   } else if (nextSlot) {
     theme = 'upcoming';
-    statusBadge = 'Upcoming Slot';
+    statusBadge = 'Upcoming Opening';
     if (!displayNote) {
       displayNote = nextSlot.start_datetime
-        ? `Available from ${new Date(nextSlot.start_datetime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}`
-        : 'Available in next scheduled window';
+        ? `Store opens at ${new Date(nextSlot.start_datetime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}`
+        : 'Store opening soon';
     }
   } else {
     theme = 'closed';
-    statusBadge = 'Unavailable';
+    statusBadge = 'Store Closed';
     if (!displayNote) {
-      displayNote = 'Not available right now';
+      displayNote = 'Store closed right now';
     }
   }
 
@@ -93,7 +93,7 @@ export default function MealTimingNote() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-black text-sm sm:text-base tracking-tight flex items-center gap-1.5">
                 <span>{theme === 'available' ? '🟢' : theme === 'upcoming' ? '⏳' : '🚫'}</span>
-                <span>{capitalizedMeal} Serving Window</span>
+                <span>Store Operating Hours</span>
               </span>
               <span className={`text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-xs ${
                 theme === 'available'
@@ -135,7 +135,7 @@ export default function MealTimingNote() {
             ) : (
               <>
                 <Clock className="w-3.5 h-3.5 text-stone-500" />
-                <span>Ordering Disabled</span>
+                <span>Ordering Closed</span>
               </>
             )}
           </span>

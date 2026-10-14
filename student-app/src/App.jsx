@@ -402,10 +402,10 @@ export default function App() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-extrabold text-amber-950">
-                    🕐 {mealNameCapitalized} ordering opens at {formattedStartTime} and closes at {formattedEndTime}.
+                    🕐 Store ordering opens at {formattedStartTime} and closes at {formattedEndTime}.
                   </p>
                   <p className="text-amber-800 text-xs mt-0.5 font-medium">
-                    You can browse today's menu items below, but ordering is currently closed until the next window opening.
+                    You can browse store products below, but ordering is currently closed until the store opens.
                   </p>
                 </div>
               </div>

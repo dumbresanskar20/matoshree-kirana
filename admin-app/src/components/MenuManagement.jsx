@@ -25,6 +25,8 @@ export default function MenuManagement() {
   const [imagePreview, setImagePreview] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [unit, setUnit] = useState('piece');
+  const [stockQuantity, setStockQuantity] = useState('100');
   const [togglingIds, setTogglingIds] = useState(new Set());
 
   // Quantity Variant States
@@ -166,6 +168,8 @@ export default function MenuManagement() {
     setName('');
     setPrice('');
     setMealType(mealTypes[0] || 'General');
+    setUnit('piece');
+    setStockQuantity('100');
     setImageUrl('');
     setImageFile(null);
     setImagePreview('');
@@ -182,6 +186,8 @@ export default function MenuManagement() {
     setName(item.name);
     setPrice(item.price.toString());
     setMealType(item.meal_type);
+    setUnit(item.unit || 'piece');
+    setStockQuantity(String(item.stock_quantity ?? item.available_quantity ?? 100));
     setImageUrl(item.image_url || '');
     setImageFile(null);
     setImagePreview(item.image_url || '');
@@ -269,6 +275,8 @@ export default function MenuManagement() {
       formData.append('name', name.trim());
       formData.append('price', effectivePrice);
       formData.append('meal_type', mealType);
+      formData.append('unit', unit || 'piece');
+      formData.append('stock_quantity', stockQuantity !== '' ? stockQuantity : '100');
       formData.append('description', description);
       formData.append('is_active', isActive);
       formData.append('has_variants', hasVariants ? '1' : '0');
@@ -1100,6 +1108,56 @@ export default function MenuManagement() {
                       + Create New Meal Type...
                     </option>
                   </select>
+                </div>
+              </div>
+
+              {/* Unit and Inventory Stock Configuration */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Measurement Unit</label>
+                  <select
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-medium"
+                  >
+                    <option value="piece">Piece (Pack / Item)</option>
+                    <option value="packet">Packet (Pkt)</option>
+                    <option value="kg">kg (Kilogram)</option>
+                    <option value="g">g (Gram)</option>
+                    <option value="litre">litre (Litre)</option>
+                    <option value="ml">ml (Millilitre)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Initial Stock Level ({unit})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    placeholder="e.g. 100"
+                    value={stockQuantity}
+                    onChange={(e) => setStockQuantity(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Automatic Total Inventory Sync Banner */}
+              <div className="p-3 bg-emerald-50/90 border border-emerald-200/90 rounded-2xl flex items-start gap-2.5">
+                <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0 mt-0.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-xs">
+                  <p className="font-extrabold text-emerald-950">
+                    ⚡ Automatic Total Inventory Sync
+                  </p>
+                  <p className="text-emerald-800 text-[11px] font-medium leading-relaxed mt-0.5">
+                    This product is automatically registered in <strong>Total Inventory</strong> under the <strong>{formatCategoryName(mealType) || 'Selected'}</strong> category with <strong>{stockQuantity || 0} {unit}</strong>. Stock deducts automatically by the exact quantity ordered when users purchase.
+                  </p>
                 </div>
               </div>
 

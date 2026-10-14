@@ -7,19 +7,52 @@ import {
 import api from '../services/api';
 import { createAdminSocketClient } from '../services/socket';
 
+const CATEGORY_ICONS = {
+  groceries: '🛒',
+  grains_pulses: '🌾',
+  dairy_eggs: '🥛',
+  dairy_proteins: '🥚',
+  cooking_essentials: '🍳',
+  oil_spices: '🌶️',
+  snacks: '🍟',
+  snack_essentials: '🍿',
+  beverages: '🥤',
+  vegetables: '🥗',
+  other: '📦'
+};
+
+const getCategoryIcon = (catId) => {
+  const clean = (catId || '').toLowerCase().trim();
+  return CATEGORY_ICONS[clean] || '🏷️';
+};
+
+const formatCategoryTitle = (catId) => {
+  if (!catId) return 'General';
+  const clean = catId.toLowerCase().trim();
+  if (clean === 'grains_pulses' || clean === 'grains & pulses') return 'Grains & Pulses';
+  if (clean === 'cooking_essentials' || clean === 'cooking_essential' || clean === 'cooking essentials') return 'Cooking Essentials';
+  if (clean === 'dairy_eggs' || clean === 'dairy & eggs') return 'Dairy & Eggs';
+  if (clean === 'dairy_proteins') return 'Dairy & Proteins';
+  if (clean === 'snack_essentials') return 'Snack Essentials';
+  if (clean === 'oil_spices') return 'Oil & Spices';
+  return clean.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+};
+
 const PREDEFINED_CATEGORIES = [
-  { id: 'vegetables', name: 'Vegetables' },
-  { id: 'grains_pulses', name: 'Grains/Flours/Pulses' },
-  { id: 'dairy_proteins', name: 'Dairy & Proteins' },
-  { id: 'oil_spices', name: 'Oil/Spices/Condiments' },
-  { id: 'snack_essentials', name: 'Snack/Fried Item Essentials' },
-  { id: 'beverages', name: 'Beverages' },
-  { id: 'other', name: 'Other' }
+  { id: 'groceries', name: 'Groceries & Staples', icon: '🛒' },
+  { id: 'grains_pulses', name: 'Grains & Pulses', icon: '🌾' },
+  { id: 'dairy_eggs', name: 'Dairy & Eggs', icon: '🥛' },
+  { id: 'cooking_essentials', name: 'Cooking Essentials', icon: '🍳' },
+  { id: 'snacks', name: 'Snacks & Namkeen', icon: '🍟' },
+  { id: 'beverages', name: 'Beverages', icon: '🥤' },
+  { id: 'vegetables', name: 'Vegetables', icon: '🥗' },
+  { id: 'other', name: 'Other', icon: '📦' }
 ];
 
 export default function InventoryManagement() {
   // Data States
   const [items, setItems] = useState([]);
+  const [storeCategories, setStoreCategories] = useState([]);
   const [stats, setStats] = useState({
     totalItems: 0,
     activeItems: 0,
@@ -46,8 +79,8 @@ export default function InventoryManagement() {
   // Modal Form Inputs
   const [editingItem, setEditingItem] = useState(null);
   const [name, setName] = useState('');
-  const [unit, setUnit] = useState('kg');
-  const [category, setCategory] = useState('vegetables');
+  const [unit, setUnit] = useState('piece');
+  const [category, setCategory] = useState('groceries');
   const [quantityInStock, setQuantityInStock] = useState('');
   const [lowStockThreshold, setLowStockThreshold] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -79,31 +112,60 @@ export default function InventoryManagement() {
   const [editedQuantities, setEditedQuantities] = useState({});
   const [editedLimits, setEditedLimits] = useState({});
 
-  // Get all unique categories in items, preserving predefined ones first
+  // Get all unique categories in items, preserving store catalog categories first
   const getCategoriesList = () => {
-    const list = [...PREDEFINED_CATEGORIES];
-    items.forEach(item => {
-      const catId = item.category || 'other';
-      if (!list.some(c => c.id === catId)) {
-        const catName = catId
-          .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        list.push({ id: catId, name: catName });
+    const list = [];
+    const seen = new Set();
+
+    // 1. Add categories loaded from store catalog windows
+    storeCategories.forEach(c => {
+      const key = (c.id || '').toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        list.push({
+          id: key,
+          name: c.name || formatCategoryTitle(key),
+          icon: c.icon || getCategoryIcon(key),
+        });
       }
     });
+
+    // 2. Add categories present in inventory items
+    items.forEach(item => {
+      const catId = (item.category || 'other').toLowerCase();
+      if (!seen.has(catId)) {
+        seen.add(catId);
+        list.push({
+          id: catId,
+          name: formatCategoryTitle(catId),
+          icon: getCategoryIcon(catId),
+        });
+      }
+    });
+
+    // 3. Fallback to predefined categories if empty
+    if (list.length === 0) {
+      PREDEFINED_CATEGORIES.forEach(c => {
+        if (!seen.has(c.id)) {
+          seen.add(c.id);
+          list.push(c);
+        }
+      });
+    }
+
     return list;
   };
 
-  // Group items by category
+  // Group items by category (exact same section as catalog)
   const getGroupedItems = () => {
+    const categoriesList = getCategoriesList();
     const grouped = {};
-    PREDEFINED_CATEGORIES.forEach(cat => {
+    categoriesList.forEach(cat => {
       grouped[cat.id] = [];
     });
 
     items.forEach(item => {
-      const cat = item.category || 'other';
+      const cat = (item.category || 'other').toLowerCase();
       if (!grouped[cat]) {
         grouped[cat] = [];
       }
@@ -117,6 +179,7 @@ export default function InventoryManagement() {
   useEffect(() => {
     fetchSummary();
     fetchMenuStock();
+    fetchStoreCategories();
 
     const token = localStorage.getItem('token');
     let socket = null;
@@ -150,6 +213,26 @@ export default function InventoryManagement() {
       }
     };
   }, []);
+
+  const fetchStoreCategories = async () => {
+    try {
+      const res = await api.get('/menu/windows');
+      if (res.data?.windows) {
+        const cats = res.data.windows
+          .map((w) => ({
+            id: (w.meal_type || '').toLowerCase(),
+            name: w.category_name || formatCategoryTitle(w.meal_type),
+            icon: w.icon || getCategoryIcon(w.meal_type),
+          }))
+          .filter((c) => Boolean(c.id));
+        if (cats.length > 0) {
+          setStoreCategories(cats);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load store catalog categories for inventory:', err.message);
+    }
+  };
 
   useEffect(() => {
     fetchItems();
@@ -220,8 +303,9 @@ export default function InventoryManagement() {
   const openAddModal = () => {
     setEditingItem(null);
     setName('');
-    setUnit('kg');
-    setCategory('vegetables');
+    setUnit('piece');
+    const availableCats = getCategoriesList();
+    setCategory(availableCats.length > 0 ? availableCats[0].id : 'groceries');
     setQuantityInStock('0');
     setLowStockThreshold('1');
     setIsActive(true);
@@ -276,6 +360,7 @@ export default function InventoryManagement() {
       setIsAddEditOpen(false);
       fetchItems();
       fetchSummary();
+      fetchMenuStock();
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to save inventory item.';
       showToast(errMsg, 'error');
@@ -284,7 +369,7 @@ export default function InventoryManagement() {
     }
   };
 
-  // 8. Restock Item (Increment Stock)
+  // 8. Restock Item (Increment Stock & Sync with Product Catalog)
   const handleRestock = async (e) => {
     e.preventDefault();
     const qty = parseFloat(restockQuantity);
@@ -296,10 +381,11 @@ export default function InventoryManagement() {
     setSaving(true);
     try {
       await api.post(`/inventory/${restockingItem.id}/restock`, { quantity: qty });
-      showToast(`Added ${qty} ${restockingItem.unit} to '${restockingItem.name}' stock.`);
+      showToast(`Restocked +${qty} ${restockingItem.unit} for '${restockingItem.name}' (Synced with Product Catalog).`);
       setIsRestockOpen(false);
       fetchItems();
       fetchSummary();
+      fetchMenuStock();
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to restock item.';
       showToast(errMsg, 'error');
@@ -752,14 +838,7 @@ export default function InventoryManagement() {
                         >
                           <div className="flex items-center gap-2.5">
                             <span className="text-xl">
-                              {cat.id === 'vegetables' && '🥗'}
-                              {cat.id === 'grains_pulses' && '🌾'}
-                              {cat.id === 'dairy_proteins' && '🥚'}
-                              {cat.id === 'oil_spices' && '🌶️'}
-                              {cat.id === 'snack_essentials' && '🍟'}
-                              {cat.id === 'beverages' && '🥤'}
-                              {cat.id === 'other' && '📦'}
-                              {!['vegetables', 'grains_pulses', 'dairy_proteins', 'oil_spices', 'snack_essentials', 'beverages', 'other'].includes(cat.id) && '🏷️'}
+                              {cat.icon || getCategoryIcon(cat.id)}
                             </span>
                             <span className="text-sm font-black text-slate-800 tracking-tight">{cat.name}</span>
                             <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full">
@@ -805,7 +884,14 @@ export default function InventoryManagement() {
                                             <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                                               {item.unique_inventory_id}
                                             </span>
-                                            <h4 className="font-black text-sm text-slate-900 mt-1">{item.name}</h4>
+                                            <h4 className="font-black text-sm text-slate-900 mt-1 flex items-center gap-1.5 flex-wrap">
+                                              <span>{item.name}</span>
+                                              {item.product_id && (
+                                                <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-1.5 py-0.5 rounded font-bold">
+                                                  Catalog
+                                                </span>
+                                              )}
+                                            </h4>
                                           </div>
                                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
                                             item.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -906,7 +992,14 @@ export default function InventoryManagement() {
                                               {item.unique_inventory_id}
                                             </td>
                                             <td className="py-3.5 font-bold text-slate-800">
-                                              {item.name}
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span>{item.name}</span>
+                                                {item.product_id && (
+                                                  <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-1.5 py-0.5 rounded font-bold">
+                                                    Catalog
+                                                  </span>
+                                                )}
+                                              </div>
                                             </td>
                                             <td className="py-3.5">
                                               <span className={`font-black text-sm ${
@@ -1017,8 +1110,10 @@ export default function InventoryManagement() {
                   required
                   className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-medium min-h-[44px]"
                 >
-                  {PREDEFINED_CATEGORIES.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  {getCategoriesList().map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1102,8 +1197,11 @@ export default function InventoryManagement() {
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-xs w-full p-6 space-y-4 border border-slate-200">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Restock Ingredient</h3>
+                <h3 className="text-base font-bold text-slate-900">Restock Item Stock</h3>
                 <span className="text-[10px] text-slate-400 font-bold block mt-0.5">{restockingItem.name} ({restockingItem.unique_inventory_id})</span>
+                <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
+                  ✓ Updates Inventory & Product Catalog automatically
+                </span>
               </div>
               <button onClick={() => setIsRestockOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 rounded-xl cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <X className="w-5 h-5" />

@@ -20,57 +20,18 @@ const shapeLog = (log) => {
   };
 };
 
-const normalizeInventoryUnit = (u) => {
-  if (!u) return 'piece';
-  const clean = String(u).toLowerCase().trim();
-  if (['kg', 'kilo', 'kilogram', 'kgs'].includes(clean)) return 'kg';
-  if (['g', 'gm', 'gram', 'grams', 'gms'].includes(clean)) return 'g';
-  if (['l', 'litre', 'liter', 'litres', 'liters'].includes(clean)) return 'litre';
-  if (['ml', 'millilitre', 'milliliter'].includes(clean)) return 'ml';
-  if (['packet', 'pkt', 'packets', 'pack', 'packs'].includes(clean)) return 'packet';
-  return 'piece';
-};
+const { syncCatalogToInventory, normalizeInventoryUnit } = require('../database/initInventorySchema');
 
+// Helper to normalize category code so it mirrors Product Catalog sections
 const normalizeInventoryCategory = (cat) => {
-  if (!cat) return 'other';
-  const c = String(cat).toLowerCase().trim();
-  if (c.includes('grain') || c.includes('pulse') || c.includes('flour') || c.includes('dal') || c.includes('atta') || c.includes('rice')) return 'grains_pulses';
-  if (c.includes('oil') || c.includes('ghee') || c.includes('spice') || c.includes('masala')) return 'oil_spices';
-  if (c.includes('dairy') || c.includes('milk') || c.includes('egg') || c.includes('protein')) return 'dairy_proteins';
-  if (c.includes('snack') || c.includes('biscuit') || c.includes('namkeen')) return 'snack_essentials';
-  if (c.includes('beverage') || c.includes('tea') || c.includes('coffee') || c.includes('drink')) return 'beverages';
-  if (c.includes('vegetable') || c.includes('fruit')) return 'vegetables';
-  return 'other';
+  if (!cat) return 'groceries';
+  const c = String(cat).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+  return c || 'groceries';
 };
 
-let catalogSyncedOnce = false;
 const ensureCatalogSyncedWithInventory = async () => {
-  if (catalogSyncedOnce) return;
   try {
-    const [products] = await pool.query('SELECT * FROM Product WHERE is_active = 1');
-    const [invItems] = await pool.query('SELECT id, name FROM InventoryItem');
-    const existingNames = new Set(invItems.map((i) => i.name.toLowerCase().trim()));
-
-    for (const prod of products) {
-      if (!existingNames.has(prod.name.toLowerCase().trim())) {
-        const [maxRows] = await pool.query(
-          "SELECT MAX(CAST(SUBSTRING(unique_inventory_id, 5) AS UNSIGNED)) AS max_id FROM InventoryItem WHERE unique_inventory_id LIKE 'INV-%'"
-        );
-        const nextNum = (maxRows[0]?.max_id || 0) + 1;
-        const uniqueId = `INV-${String(nextNum).padStart(4, '0')}`;
-        const unit = normalizeInventoryUnit(prod.unit);
-        const category = normalizeInventoryCategory(prod.category);
-        const stock = Number(prod.stock_quantity !== undefined ? prod.stock_quantity : (prod.available_quantity || 100));
-
-        await pool.query(
-          `INSERT INTO InventoryItem (unique_inventory_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
-           VALUES (?, ?, ?, ?, 5.000, ?, 1)`,
-          [uniqueId, prod.name.trim(), unit, stock, category]
-        );
-        existingNames.add(prod.name.toLowerCase().trim());
-      }
-    }
-    catalogSyncedOnce = true;
+    await syncCatalogToInventory(pool);
   } catch (err) {
     console.warn('[Inventory] ensureCatalogSyncedWithInventory notice:', err.message);
   }
@@ -97,7 +58,7 @@ const createInventoryItem = async (req, res) => {
       });
     }
 
-    const cleanCategory = (category || 'other').toString().toLowerCase().trim();
+    const cleanCategory = normalizeInventoryCategory(category);
 
     // Case-insensitive duplicate name check
     const [allItems] = await pool.query('SELECT id, name FROM InventoryItem');
@@ -113,8 +74,18 @@ const createInventoryItem = async (req, res) => {
     const connection = await pool.getConnection();
     let uniqueId;
     let itemId;
+    let matchedProdId = null;
     try {
       await connection.beginTransaction();
+
+      // Check if this item exists in Product Catalog
+      const [prodRows] = await connection.execute(
+        'SELECT id FROM Product WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
+        [name.trim()]
+      );
+      if (prodRows.length > 0) {
+        matchedProdId = prodRows[0].id;
+      }
 
       // Find max existing number in InventoryItem to avoid duplicate key conflicts
       const [maxRows] = await connection.execute(
@@ -156,19 +127,19 @@ const createInventoryItem = async (req, res) => {
         }
       }
 
-      // Insert new item
+      // Insert new inventory item with product_id link
       const [insertResult] = await connection.execute(
-        `INSERT INTO InventoryItem (unique_inventory_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, 1)`,
-        [uniqueId, name.trim(), cleanUnit, Number(quantity_in_stock), Number(low_stock_threshold), cleanCategory]
+        `INSERT INTO InventoryItem (unique_inventory_id, product_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+        [uniqueId, matchedProdId, name.trim(), cleanUnit, Number(quantity_in_stock), Number(low_stock_threshold), cleanCategory]
       );
       itemId = insertResult.insertId;
 
       // Write initial log if stock > 0
       if (Number(quantity_in_stock) > 0) {
         await connection.execute(
-          `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id)
-           VALUES (?, 'restock', ?, ?)`,
+          `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id, reason)
+           VALUES (?, 'restock', ?, ?, 'Initial Registration')`,
           [itemId, Number(quantity_in_stock), req.adminId || null]
         );
       }
@@ -180,6 +151,14 @@ const createInventoryItem = async (req, res) => {
     } finally {
       connection.release();
     }
+
+    try {
+      const io = req.app.get('socketio');
+      if (io) {
+        io.emit('inventory:stock_updated', { item_id: itemId });
+        if (matchedProdId) io.emit('menu:updated', { product_id: matchedProdId });
+      }
+    } catch (_) {}
 
     const [newRows] = await pool.execute('SELECT * FROM InventoryItem WHERE id = ? LIMIT 1', [itemId]);
     const newItem = newRows[0];
@@ -261,17 +240,7 @@ const updateInventoryItem = async (req, res) => {
     }
 
     if (updates.unit) {
-      const validUnits = ['kg', 'g', 'litre', 'ml', 'piece', 'packet'];
-      if (!validUnits.includes(updates.unit)) {
-        return res.status(400).json({ success: false, message: 'Invalid unit.' });
-      }
-    }
-
-    if (updates.category !== undefined) {
-      const validCategories = ['vegetables', 'grains_pulses', 'dairy_proteins', 'oil_spices', 'snack_essentials', 'beverages', 'other'];
-      if (!validCategories.includes(updates.category)) {
-        return res.status(400).json({ success: false, message: 'Invalid category.' });
-      }
+      updates.unit = normalizeInventoryUnit(updates.unit);
     }
 
     // Prepare update data
@@ -280,7 +249,7 @@ const updateInventoryItem = async (req, res) => {
     if (updates.unit !== undefined) data.unit = updates.unit;
     if (updates.quantity_in_stock !== undefined) data.quantity_in_stock = Number(updates.quantity_in_stock);
     if (updates.low_stock_threshold !== undefined) data.low_stock_threshold = Number(updates.low_stock_threshold);
-    if (updates.category !== undefined) data.category = updates.category;
+    if (updates.category !== undefined) data.category = normalizeInventoryCategory(updates.category);
     if (updates.is_active !== undefined) {
       if (typeof updates.is_active === 'string') {
         data.is_active = updates.is_active === 'true' ? 1 : 0;
@@ -309,10 +278,43 @@ const updateInventoryItem = async (req, res) => {
         const diff = Number(updates.quantity_in_stock) - Number(existing.quantity_in_stock);
         if (diff !== 0) {
           await connection.execute(
-            `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id)
-             VALUES (?, ?, ?, ?)`,
+            `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id, reason)
+             VALUES (?, ?, ?, ?, 'Manual Stock Adjustment')`,
             [targetId, diff > 0 ? 'restock' : 'deduction', diff, req.adminId || null]
           );
+        }
+      }
+
+      // Sync corresponding Product in Product Catalog
+      let prodId = existing.product_id;
+      if (!prodId) {
+        const [pRows] = await connection.execute(
+          'SELECT id FROM Product WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
+          [existing.name]
+        );
+        if (pRows.length > 0) {
+          prodId = pRows[0].id;
+          await connection.execute('UPDATE InventoryItem SET product_id = ? WHERE id = ?', [prodId, targetId]);
+        }
+      }
+
+      if (prodId) {
+        const prodSets = [];
+        const prodVals = [];
+        if (data.name) { prodSets.push('name = ?'); prodVals.push(data.name); }
+        if (data.category) { prodSets.push('category = ?', 'meal_type = ?'); prodVals.push(data.category, data.category); }
+        if (data.unit) { prodSets.push('unit = ?'); prodVals.push(data.unit); }
+        if (data.is_active !== undefined) { prodSets.push('is_active = ?', 'is_available = ?'); prodVals.push(data.is_active, data.is_active); }
+        if (data.quantity_in_stock !== undefined) {
+          prodSets.push('stock_quantity = ?', 'available_quantity = ?');
+          prodVals.push(data.quantity_in_stock, Math.round(data.quantity_in_stock));
+          prodSets.push('in_stock = ?', 'is_available = ?');
+          const hasStock = data.quantity_in_stock > 0 ? 1 : 0;
+          prodVals.push(hasStock, hasStock);
+        }
+        if (prodSets.length > 0) {
+          prodVals.push(prodId);
+          await connection.execute(`UPDATE Product SET ${prodSets.join(', ')} WHERE id = ?`, prodVals);
         }
       }
 
@@ -323,6 +325,14 @@ const updateInventoryItem = async (req, res) => {
     } finally {
       connection.release();
     }
+
+    try {
+      const io = req.app.get('socketio');
+      if (io) {
+        io.emit('inventory:stock_updated', { item_id: targetId });
+        io.emit('menu:stock_updated', { item_id: targetId });
+      }
+    } catch (_) {}
 
     const [updatedRows] = await pool.execute('SELECT * FROM InventoryItem WHERE id = ? LIMIT 1', [targetId]);
     const updated = updatedRows[0];
@@ -351,6 +361,11 @@ const deleteInventoryItem = async (req, res) => {
 
     await pool.execute('DELETE FROM InventoryItem WHERE id = ?', [targetId]);
 
+    try {
+      const io = req.app.get('socketio');
+      if (io) io.emit('inventory:stock_updated', { item_id: targetId });
+    } catch (_) {}
+
     return res.status(200).json({
       success: true,
       message: 'Inventory item deleted successfully from database.',
@@ -361,7 +376,7 @@ const deleteInventoryItem = async (req, res) => {
   }
 };
 
-// 5. Restock Item (Add stock)
+// 5. Restock Item (Add stock to both Inventory and Product Catalog)
 const restockInventoryItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -381,19 +396,46 @@ const restockInventoryItem = async (req, res) => {
 
     // Atomic update stock and log in transaction
     const connection = await pool.getConnection();
+    let prodId = existing.product_id;
     try {
       await connection.beginTransaction();
 
+      // 1. Update InventoryItem stock
       await connection.execute(
         'UPDATE InventoryItem SET quantity_in_stock = quantity_in_stock + ? WHERE id = ?',
         [amount, targetId]
       );
 
+      // 2. Audit log entry
       await connection.execute(
-        `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id)
-         VALUES (?, 'restock', ?, ?)`,
+        `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id, reason)
+         VALUES (?, 'restock', ?, ?, 'Manual Restock from Inventory')`,
         [targetId, amount, req.adminId || null]
       );
+
+      // 3. Find and update corresponding Product in Product Catalog
+      if (!prodId) {
+        const [prodRows] = await connection.execute(
+          'SELECT id FROM Product WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
+          [existing.name]
+        );
+        if (prodRows.length > 0) {
+          prodId = prodRows[0].id;
+          await connection.execute('UPDATE InventoryItem SET product_id = ? WHERE id = ?', [prodId, targetId]);
+        }
+      }
+
+      if (prodId) {
+        await connection.execute(
+          `UPDATE Product 
+           SET stock_quantity = stock_quantity + ?,
+               available_quantity = available_quantity + ?,
+               in_stock = 1,
+               is_available = 1
+           WHERE id = ?`,
+          [amount, Math.round(amount), prodId]
+        );
+      }
 
       await connection.commit();
     } catch (error) {
@@ -402,6 +444,18 @@ const restockInventoryItem = async (req, res) => {
     } finally {
       connection.release();
     }
+
+    // 4. Emit real-time updates to Admin inventory and Product Catalog
+    try {
+      const io = req.app.get('socketio');
+      if (io) {
+        io.emit('inventory:stock_updated', { item_id: targetId, restocked: amount });
+        if (prodId) {
+          io.emit('menu:stock_updated', { product_id: prodId, restocked: amount });
+          io.emit('menu:updated', { product_id: prodId });
+        }
+      }
+    } catch (_) {}
 
     const [updatedRows] = await pool.execute('SELECT * FROM InventoryItem WHERE id = ? LIMIT 1', [targetId]);
     const updated = updatedRows[0];
@@ -749,4 +803,8 @@ module.exports = {
   toggleMenuStockTracking,
   updateMenuItemStock,
   batchUpdateMenuStock,
+  normalizeInventoryCategory,
+  normalizeInventoryUnit,
+  ensureCatalogSyncedWithInventory,
 };
+

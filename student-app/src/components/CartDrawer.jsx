@@ -799,10 +799,10 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
               </span>
               <div className="space-y-0.5">
                 <p className="font-extrabold">
-                  {(selectedMealType || currentMealWindow?.meal_type || 'meal').charAt(0).toUpperCase() + (selectedMealType || currentMealWindow?.meal_type || 'meal').slice(1)} Serving Status
+                  Store Operating Status
                 </p>
                 <p className="text-[11px] font-semibold leading-relaxed">
-                  {currentMealWindow?.serving_note || ((currentMealWindow?.isAvailableNow ?? currentMealWindow?.is_currently_open) ? 'Service is ongoing.' : 'Ordering is currently closed.')}
+                  {currentMealWindow?.serving_note || ((currentMealWindow?.isAvailableNow ?? currentMealWindow?.is_currently_open) ? 'Store is open for orders.' : 'Store ordering is currently closed.')}
                 </p>
               </div>
             </div>
@@ -947,7 +947,7 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
                 ) : !(currentMealWindow ? (currentMealWindow.isAvailableNow ?? currentMealWindow.is_currently_open) : true) ? (
                   <>
                     <Clock className="w-4 h-4 shrink-0" />
-                    <span>{currentMealWindow?.serving_note || 'Ordering Closed Right Now'}</span>
+                    <span>{currentMealWindow?.serving_note || 'Store Closed Right Now'}</span>
                   </>
                 ) : (
                   <>
@@ -961,7 +961,7 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
                 {!selectedAddressId
                   ? 'Please select a delivery address to continue'
                   : !(currentMealWindow ? (currentMealWindow.isAvailableNow ?? currentMealWindow.is_currently_open) : true)
-                  ? 'Orders can only be placed during active serving slots'
+                  ? 'Orders can only be placed during store operating hours'
                   : 'Pay online & get instant order token number'}
               </p>
             </div>

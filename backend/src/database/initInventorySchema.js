@@ -113,10 +113,118 @@ const initInventorySchema = async () => {
       ON DUPLICATE KEY UPDATE key_name = key_name;
     `);
 
+    // 9. Ensure InventoryItem has product_id column linking directly to Product Catalog
+    try {
+      const [prodIdCols] = await pool.query("SHOW COLUMNS FROM `InventoryItem` LIKE 'product_id'");
+      if (prodIdCols.length === 0) {
+        await pool.query('ALTER TABLE `InventoryItem` ADD COLUMN `product_id` INT NULL AFTER `unique_inventory_id`');
+        try {
+          await pool.query('ALTER TABLE `InventoryItem` ADD INDEX `idx_inv_product_id` (`product_id`)');
+        } catch (_) {}
+        console.log('✅ [Database] Added `product_id` column & index to `InventoryItem`.');
+      }
+    } catch (_colErr) {
+      console.warn('⚠️ [Database] InventoryItem product_id column check warning:', _colErr.message);
+    }
+
+    // 10. Automatically sync all products in Product Catalog into Total Inventory
+    try {
+      await syncCatalogToInventory(pool);
+    } catch (syncErr) {
+      console.warn('⚠️ [Database] Initial catalog-to-inventory sync warning:', syncErr.message);
+    }
+
     console.log('✅ [Database] Inventory tables, MenuItem stock columns & config verified successfully.');
   } catch (error) {
     console.error('⚠️ [Database] Failed to verify inventory tables:', error.message);
   }
 };
 
-module.exports = { initInventorySchema };
+const normalizeInventoryUnit = (u) => {
+  if (!u) return 'piece';
+  const clean = String(u).toLowerCase().trim();
+  if (['kg', 'kilo', 'kilogram', 'kgs'].includes(clean)) return 'kg';
+  if (['g', 'gm', 'gram', 'grams', 'gms'].includes(clean)) return 'g';
+  if (['l', 'litre', 'liter', 'litres', 'liters'].includes(clean)) return 'litre';
+  if (['ml', 'millilitre', 'milliliter'].includes(clean)) return 'ml';
+  if (['packet', 'pkt', 'packets', 'pack', 'packs'].includes(clean)) return 'packet';
+  return 'piece';
+};
+
+/**
+ * Ensures all items currently in Product Catalog exist in InventoryItem table
+ * under the exact same category/section.
+ */
+const syncCatalogToInventory = async (dbPool = pool) => {
+  try {
+    const [products] = await dbPool.query('SELECT * FROM Product');
+    if (!products || products.length === 0) return;
+
+    const [invItems] = await dbPool.query('SELECT id, product_id, name, unique_inventory_id FROM InventoryItem');
+    const invByProdId = new Map();
+    const invByName = new Map();
+
+    for (const inv of invItems) {
+      if (inv.product_id) invByProdId.set(Number(inv.product_id), inv);
+      if (inv.name) invByName.set(inv.name.toLowerCase().trim(), inv);
+    }
+
+    const [maxRows] = await dbPool.query(
+      "SELECT MAX(CAST(SUBSTRING(unique_inventory_id, 5) AS UNSIGNED)) AS max_id FROM InventoryItem WHERE unique_inventory_id LIKE 'INV-%'"
+    );
+    let nextNum = (maxRows[0]?.max_id || 0) + 1;
+
+    for (const prod of products) {
+      const prodCategory = (prod.meal_type || prod.category || 'groceries').toString().toLowerCase().trim();
+      const prodUnit = normalizeInventoryUnit(prod.unit);
+      const prodStock = Number(prod.stock_quantity !== undefined ? prod.stock_quantity : (prod.available_quantity || 100));
+
+      const existingByProdId = invByProdId.get(Number(prod.id));
+      const existingByName = invByName.get(prod.name.toLowerCase().trim());
+      const existing = existingByProdId || existingByName;
+
+      if (existing) {
+        // Keep category section and product_id synchronized
+        await dbPool.query(
+          `UPDATE InventoryItem 
+           SET product_id = COALESCE(product_id, ?),
+               category = ?,
+               is_active = ?
+           WHERE id = ?`,
+          [prod.id, prodCategory, prod.is_active ? 1 : 0, existing.id]
+        );
+      } else {
+        // Create matching inventory item
+        const uniqueId = `INV-${String(nextNum).padStart(4, '0')}`;
+        nextNum += 1;
+
+        const [insertRes] = await dbPool.query(
+          `INSERT INTO InventoryItem (unique_inventory_id, product_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
+           VALUES (?, ?, ?, ?, ?, 5.000, ?, ?)`,
+          [uniqueId, prod.id, prod.name.trim(), prodUnit, prodStock, prodCategory, prod.is_active ? 1 : 0]
+        );
+
+        if (prodStock > 0) {
+          try {
+            await dbPool.query(
+              `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, reason)
+               VALUES (?, 'restock', ?, 'Initial Sync from Product Catalog')`,
+              [insertRes.insertId, prodStock]
+            );
+          } catch (_) {}
+        }
+      }
+    }
+
+    // Update InventoryCounter to latest sequence value
+    await dbPool.query(
+      'UPDATE `InventoryCounter` SET `last_value` = GREATEST(`last_value`, ?) WHERE id = 1',
+      [nextNum]
+    );
+  } catch (err) {
+    console.warn('[Database] syncCatalogToInventory warning:', err.message);
+  }
+};
+
+module.exports = { initInventorySchema, syncCatalogToInventory, normalizeInventoryUnit };
+

@@ -228,15 +228,9 @@ const normalizeInventoryUnit = (u) => {
  * Normalizes categories for inventory categorization
  */
 const normalizeInventoryCategory = (cat) => {
-  if (!cat) return 'other';
-  const c = String(cat).toLowerCase().trim();
-  if (c.includes('grain') || c.includes('pulse') || c.includes('flour') || c.includes('dal') || c.includes('atta') || c.includes('rice')) return 'grains_pulses';
-  if (c.includes('oil') || c.includes('ghee') || c.includes('spice') || c.includes('masala')) return 'oil_spices';
-  if (c.includes('dairy') || c.includes('milk') || c.includes('egg') || c.includes('protein')) return 'dairy_proteins';
-  if (c.includes('snack') || c.includes('biscuit') || c.includes('namkeen')) return 'snack_essentials';
-  if (c.includes('beverage') || c.includes('tea') || c.includes('coffee') || c.includes('drink')) return 'beverages';
-  if (c.includes('vegetable') || c.includes('fruit')) return 'vegetables';
-  return 'other';
+  if (!cat) return 'groceries';
+  const c = String(cat).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+  return c || 'groceries';
 };
 
 /**
@@ -248,93 +242,18 @@ const cleanBaseItemName = (name) => {
 };
 
 /**
- * Computes exact deduction quantity based on orderItem quantity and variant configuration
- * e.g., 1 pack of 1 kg basmati rice -> 1 kg
- *       2 packs of 500 g basmati rice -> 1 kg
- *       1 pack of 5 kg basmati rice -> 5 kg
+ * Computes exact deduction quantity based on the quantity the user ordered.
+ * Adheres strictly to: deduct only the quantity which the user has ordered.
  */
 const calculateOrderItemDeductQuantity = (orderItem, product) => {
-  const orderedCount = Math.max(1, Number(orderItem.quantity) || 1);
-  const variantName = (orderItem.variant_name || '').trim();
-  const itemName = (orderItem.item_name || '').trim();
-  const productUnit = normalizeInventoryUnit(product?.unit);
-
-  let variantMultiplier = 1;
-
-  // 1. Try matching product.variants JSON if available
-  let parsedVariants = [];
-  if (product && product.variants) {
-    try {
-      parsedVariants = typeof product.variants === 'string' ? JSON.parse(product.variants) : product.variants;
-    } catch (_) {
-      parsedVariants = [];
-    }
-  }
-
-  if (Array.isArray(parsedVariants) && parsedVariants.length > 0) {
-    const matched = parsedVariants.find((v) => {
-      if (!v) return false;
-      const vName = String(v.name || '').toLowerCase().trim();
-      const targetName = variantName.toLowerCase();
-      return (
-        (targetName && (vName === targetName || vName.includes(targetName) || targetName.includes(vName))) ||
-        (v.id && String(v.id).toLowerCase() === String(orderItem.variant_id || '').toLowerCase()) ||
-        (itemName && itemName.toLowerCase().includes(vName))
-      );
-    });
-
-    if (matched && matched.quantity !== undefined && !isNaN(Number(matched.quantity))) {
-      return Number(matched.quantity) * orderedCount;
-    }
-  }
-
-  // 2. Parse variant string (e.g. "500 g", "1 kg", "2 kg", "5 kg", "500 ml", "1 L", "2 L", "800g")
-  const textToScan = `${variantName} ${itemName}`;
-  const match = textToScan.match(/(\d+(?:\.\d+)?)\s*(kg|kilo|g|gram|l|litre|liter|ml|piece|pc|packet|pkt)\b/i);
-
-  if (match) {
-    const num = parseFloat(match[1]);
-    const unitFound = match[2].toLowerCase();
-
-    if (!isNaN(num) && num > 0) {
-      if (productUnit === 'kg') {
-        if (['g', 'gram'].includes(unitFound)) {
-          variantMultiplier = num / 1000;
-        } else if (['kg', 'kilo'].includes(unitFound)) {
-          variantMultiplier = num;
-        }
-      } else if (productUnit === 'g') {
-        if (['kg', 'kilo'].includes(unitFound)) {
-          variantMultiplier = num * 1000;
-        } else if (['g', 'gram'].includes(unitFound)) {
-          variantMultiplier = num;
-        }
-      } else if (productUnit === 'litre') {
-        if (['ml'].includes(unitFound)) {
-          variantMultiplier = num / 1000;
-        } else if (['l', 'litre', 'liter'].includes(unitFound)) {
-          variantMultiplier = num;
-        }
-      } else if (productUnit === 'ml') {
-        if (['l', 'litre', 'liter'].includes(unitFound)) {
-          variantMultiplier = num * 1000;
-        } else if (['ml'].includes(unitFound)) {
-          variantMultiplier = num;
-        }
-      } else {
-        variantMultiplier = 1;
-      }
-    }
-  }
-
-  return variantMultiplier * orderedCount;
+  return Math.max(1, Number(orderItem.quantity) || 1);
 };
 
 /**
  * Deducts ordered item counts from Total Inventory (both Product and InventoryItem tables)
- * when admin delivers the order successfully.
+ * immediately as the user places their order.
  */
-const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
+const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Placed') => {
   try {
     // 1. Prevent duplicate deduction if already deducted
     const [existingLogs] = await db.query(
@@ -342,7 +261,6 @@ const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
       [orderId]
     );
     if (existingLogs && existingLogs.length > 0) {
-      console.log(`[OrderController] Order #${orderId} inventory already deducted. Skipping duplicate.`);
       return [];
     }
 
@@ -380,12 +298,13 @@ const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
         product = pRows[0] || null;
       }
 
+      // Deduct ONLY the quantity which the user has ordered
       const deductQty = calculateOrderItemDeductQuantity(item, product);
       const itemName = product?.name || cleanName || item.item_name;
 
       // A. Deduct from Product table
       if (product) {
-        const currentStock = Number(product.stock_quantity !== undefined ? product.stock_quantity : product.available_quantity);
+        const currentStock = Number(product.stock_quantity !== undefined ? product.stock_quantity : (product.available_quantity || 100));
         const newStock = Math.max(0, currentStock - deductQty);
         const newAvail = Math.max(0, Math.floor(newStock));
         const inStock = newStock > 0 ? 1 : 0;
@@ -400,26 +319,32 @@ const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
 
       // B. Deduct from InventoryItem table
       let invItem = null;
-      const [invRows] = await db.query(
-        'SELECT * FROM InventoryItem WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
-        [itemName]
-      );
-      if (invRows.length > 0) {
-        invItem = invRows[0];
-      } else {
-        const [fuzzyRows] = await db.query(
-          'SELECT * FROM InventoryItem WHERE LOWER(?) LIKE CONCAT("%", LOWER(TRIM(name)), "%") LIMIT 1',
+      if (product && product.id) {
+        const [pInvRows] = await db.query('SELECT * FROM InventoryItem WHERE product_id = ? LIMIT 1', [product.id]);
+        if (pInvRows.length > 0) invItem = pInvRows[0];
+      }
+      if (!invItem) {
+        const [invRows] = await db.query(
+          'SELECT * FROM InventoryItem WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
           [itemName]
         );
-        if (fuzzyRows.length > 0) {
-          invItem = fuzzyRows[0];
+        if (invRows.length > 0) {
+          invItem = invRows[0];
+        } else {
+          const [fuzzyRows] = await db.query(
+            'SELECT * FROM InventoryItem WHERE LOWER(?) LIKE CONCAT("%", LOWER(TRIM(name)), "%") LIMIT 1',
+            [itemName]
+          );
+          if (fuzzyRows.length > 0) {
+            invItem = fuzzyRows[0];
+          }
         }
       }
 
-      // Auto-register in InventoryItem if not existing yet
+      // Auto-register in InventoryItem if not existing yet (in same section)
       if (!invItem) {
         const unit = normalizeInventoryUnit(product?.unit || 'piece');
-        const category = normalizeInventoryCategory(product?.category);
+        const category = normalizeInventoryCategory(product?.category || product?.meal_type || 'groceries');
         const initialStock = product ? Math.max(0, Number(product.stock_quantity || 100) - deductQty) : 0;
 
         const [maxRows] = await db.query(
@@ -430,9 +355,9 @@ const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
 
         try {
           const [insertRes] = await db.query(
-            `INSERT INTO InventoryItem (unique_inventory_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
-             VALUES (?, ?, ?, ?, 5.000, ?, 1)`,
-            [uniqueId, itemName, unit, initialStock, category]
+            `INSERT INTO InventoryItem (unique_inventory_id, product_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
+             VALUES (?, ?, ?, ?, ?, 5.000, ?, 1)`,
+            [uniqueId, product?.id || null, itemName, unit, initialStock, category]
           );
           const [newInvRows] = await db.query('SELECT * FROM InventoryItem WHERE id = ?', [insertRes.insertId]);
           invItem = newInvRows[0] || null;
@@ -460,7 +385,7 @@ const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
             -deductQty,
             adminId || null,
             orderId,
-            `Delivered Order ${tokenNumber}`
+            reason ? `${reason} (Token ${tokenNumber})` : `Order ${tokenNumber} Placed`
           ]
         );
       }
@@ -475,10 +400,12 @@ const deductInventoryOnOrderDelivery = async (db, orderId, adminId) => {
 
     return deductionResults;
   } catch (err) {
-    console.error('[OrderController] Error deducting inventory on delivery:', err);
+    console.error('[OrderController] Error deducting inventory for order:', err);
     return [];
   }
 };
+
+const deductInventoryOnOrderDelivery = deductInventoryForOrder;
 
 /**
  * Restores deducted stock to both Product and InventoryItem if a delivered order is cancelled
@@ -526,11 +453,6 @@ const restoreInventoryOnOrderCancel = async (db, orderId, adminId) => {
   } catch (err) {
     console.error('[OrderController] Error restoring inventory on cancellation:', err);
   }
-};
-
-// Legacy helper kept for backwards compatibility (deductions now occur when admin delivers order)
-const deductInventoryForOrder = async (connection, orderId) => {
-  return true;
 };
 
 // Create Razorpay Order (STRICT STUDENT JWT ENFORCED VIA verifyStudent MIDDLEWARE)
@@ -1073,7 +995,8 @@ const fulfillPaidOrder = async ({
       }
     }
 
-    // Stock inventory deduction is executed when the order is marked 'delivered' by the admin.
+    // Deduct stock from InventoryItem and Product as the user orders the product
+    await deductInventoryForOrder(connection, finalOrderId, null, `Order #${finalTokenNumber} Placed`);
     await connection.commit();
   } catch (fulfillErr) {
     await connection.rollback();
@@ -1090,6 +1013,7 @@ const fulfillPaidOrder = async ({
   // 7. Emit real-time updates to Kitchen, Students, and Stock listeners
   if (io) {
     io.emit('menu:stock_updated', { order_id: finalOrderId });
+    io.emit('inventory:stock_updated', { order_id: finalOrderId });
     const socketPayload = {
       _id: updatedOrder.id,
       id: updatedOrder.id,
@@ -2650,7 +2574,8 @@ const createManualOrder = async (req, res) => {
         );
       }
 
-      // Stock inventory deduction will execute when this order is marked 'delivered' by the admin.
+      // Deduct stock immediately from InventoryItem and Product as walk-in order is placed
+      await deductInventoryForOrder(connection, finalOrderId, req.adminId, `Walk-in Order #${finalTokenNumber} Placed`);
       await connection.commit();
     } catch (txErr) {
       await connection.rollback();
@@ -2695,6 +2620,7 @@ const createManualOrder = async (req, res) => {
       io.to('kitchen').emit('income:updated');
       io.emit('menu:sales_updated', { meal_type: createdOrder.meal_type });
       io.emit('menu:updated', { meal_type: createdOrder.meal_type });
+      io.emit('inventory:stock_updated', { order_id: finalOrderId });
     }
 
     return res.status(201).json({

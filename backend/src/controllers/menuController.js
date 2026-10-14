@@ -1,6 +1,6 @@
 const { pool } = require('../database/db');
 const { deleteLocalImage, formatPublicImageUrl } = require('../config/storage');
-const { isMenuStockTrackingEnabled } = require('./inventoryController');
+const { isMenuStockTrackingEnabled, normalizeInventoryUnit, normalizeInventoryCategory } = require('./inventoryController');
 const { getAllMealSlots, getNowIST } = require('../services/mealSlotService');
 
 const getCurrentTimeHHMM = () => {
@@ -236,17 +236,20 @@ const getMenuItems = async (req, res) => {
       console.warn('[MenuController] getAllMealSlots warning:', slotErr.message);
     }
 
+    const storeSlot = allSlots['store_hours'] || Object.values(allSlots).find((s) => s.is_full_day || (s.slots && s.slots.some((x) => x.start_datetime || x.is_active)));
+
     const windowMap = {};
     windows.forEach((w) => {
       const formatted = computeMealStatus(w, currentTime);
-      const slotData = allSlots[w.meal_type.toLowerCase()];
-      if (slotData && slotData.slots && slotData.slots.some((s) => s.start_datetime || s.is_active)) {
+      const slotData = storeSlot || allSlots[w.meal_type.toLowerCase()];
+      if (slotData && (slotData.is_full_day || (slotData.slots && slotData.slots.some((s) => s.start_datetime || s.is_active)) || slotData.custom_note)) {
         formatted.isAvailableNow = slotData.isAvailableNow;
         formatted.activeSlot = slotData.activeSlot;
         formatted.nextSlot = slotData.nextSlot;
         formatted.slots = slotData.slots;
         formatted.serving_note = slotData.serving_note;
         formatted.is_currently_open = slotData.isAvailableNow;
+        formatted.is_full_day = slotData.is_full_day;
       } else {
         formatted.isAvailableNow = formatted.is_currently_open;
         formatted.activeSlot = null;
@@ -267,7 +270,9 @@ const getMenuItems = async (req, res) => {
 
     if (meal_type) {
       const targetType = meal_type.toLowerCase();
-      const status = windowMap[targetType] || { is_active: true, is_currently_open: true };
+      const status = storeSlot
+        ? { is_active: storeSlot.isAvailableNow || storeSlot.is_full_day, is_currently_open: storeSlot.isAvailableNow }
+        : (windowMap[targetType] || { is_active: true, is_currently_open: true });
 
       if (isStudentFetch && !status.is_active) {
         return res.status(200).json({
@@ -643,6 +648,64 @@ const createMenuItem = async (req, res) => {
       );
       menuItemId = menuResult.insertId;
 
+      // AUTOMATICALLY ADD PRODUCT TO TOTAL INVENTORY in the SAME SECTION (CATEGORY)
+      try {
+        const cleanInvCategory = normalizeInventoryCategory(resolvedCategory || resolvedMealType || 'groceries');
+        const cleanInvUnit = normalizeInventoryUnit(finalUnit);
+
+        // Check if an inventory item already exists by name
+        const [existingInv] = await connection.execute(
+          'SELECT id, quantity_in_stock FROM InventoryItem WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1',
+          [name.trim()]
+        );
+
+        let invItemId = null;
+        if (existingInv && existingInv.length > 0) {
+          invItemId = existingInv[0].id;
+          await connection.execute(
+            `UPDATE InventoryItem 
+             SET product_id = ?, category = ?, unit = ?, is_active = ?, quantity_in_stock = ?
+             WHERE id = ?`,
+            [menuItemId, cleanInvCategory, cleanInvUnit, parsedIsActive ? 1 : 0, finalStockQty, invItemId]
+          );
+        } else {
+          // Generate next unique INV-XXXX sequence atomically
+          const [maxRows] = await connection.execute(
+            `SELECT MAX(CAST(SUBSTRING(unique_inventory_id, 5) AS UNSIGNED)) AS max_id 
+             FROM InventoryItem 
+             WHERE unique_inventory_id LIKE 'INV-%'`
+          );
+          const nextVal = (maxRows[0]?.max_id || 0) + 1;
+          const uniqueId = `INV-${String(nextVal).padStart(4, '0')}`;
+
+          await connection.execute(
+            `INSERT INTO \`InventoryCounter\` (\`id\`, \`last_value\`)
+             VALUES (1, ?)
+             ON DUPLICATE KEY UPDATE \`last_value\` = GREATEST(\`last_value\`, ?)`,
+            [nextVal, nextVal]
+          );
+
+          const [invInsert] = await connection.execute(
+            `INSERT INTO InventoryItem (unique_inventory_id, product_id, name, unit, quantity_in_stock, low_stock_threshold, category, is_active)
+             VALUES (?, ?, ?, ?, ?, 5.000, ?, ?)`,
+            [uniqueId, menuItemId, name.trim(), cleanInvUnit, finalStockQty, cleanInvCategory, parsedIsActive ? 1 : 0]
+          );
+          invItemId = invInsert.insertId;
+
+          if (finalStockQty > 0) {
+            try {
+              await connection.execute(
+                `INSERT INTO InventoryLog (inventory_item_id, action_type, quantity_changed, admin_user_id, reason)
+                 VALUES (?, 'restock', ?, ?, 'Initial Stock from Product Catalog')`,
+                [invItemId, finalStockQty, req.adminId || null]
+              );
+            } catch (_) {}
+          }
+        }
+      } catch (invErr) {
+        console.warn('[createMenuItem] Auto-inventory registration notice:', invErr.message);
+      }
+
       if (recipeData.length > 0) {
         try {
           for (const r of recipeData) {
@@ -677,6 +740,7 @@ const createMenuItem = async (req, res) => {
       const io = req.app.get('socketio');
       if (io) {
         io.emit('menu:updated', { item_id: menuItemId, is_active: item.is_active });
+        io.emit('inventory:stock_updated', { product_id: menuItemId });
       }
     } catch (socketErr) {
       console.warn('[createMenuItem] Socket emit warning:', socketErr.message);
@@ -808,6 +872,44 @@ const updateMenuItem = async (req, res) => {
         }
       }
 
+      // Synchronize changes to InventoryItem
+      try {
+        const invSet = [];
+        const invVals = [];
+        if (updates.name) {
+          invSet.push('name = ?');
+          invVals.push(updates.name.trim());
+        }
+        if (updates.category || updates.meal_type) {
+          const newCat = normalizeInventoryCategory(updates.category || updates.meal_type);
+          invSet.push('category = ?');
+          invVals.push(newCat);
+        }
+        if (updates.unit) {
+          invSet.push('unit = ?');
+          invVals.push(normalizeInventoryUnit(updates.unit));
+        }
+        if (updates.is_active !== undefined) {
+          invSet.push('is_active = ?');
+          invVals.push(updates.is_active);
+        }
+        if (updates.stock_quantity !== undefined) {
+          invSet.push('quantity_in_stock = ?');
+          invVals.push(Number(updates.stock_quantity));
+        }
+
+        if (invSet.length > 0) {
+          invVals.push(targetId);
+          invVals.push(existingItem.name.trim().toLowerCase());
+          await connection.execute(
+            `UPDATE InventoryItem SET ${invSet.join(', ')} WHERE product_id = ? OR LOWER(TRIM(name)) = ?`,
+            invVals
+          );
+        }
+      } catch (invSyncErr) {
+        console.warn('[updateMenuItem] InventoryItem sync notice:', invSyncErr.message);
+      }
+
       await connection.commit();
 
       // On successful database update, delete old local image if a new image was uploaded
@@ -833,6 +935,7 @@ const updateMenuItem = async (req, res) => {
       const io = req.app.get('socketio');
       if (io) {
         io.emit('menu:updated', { item_id: targetId, is_active: item.is_active });
+        io.emit('inventory:stock_updated', { product_id: targetId });
       }
     } catch (socketErr) {
       console.warn('[updateMenuItem] Socket emit warning:', socketErr.message);
@@ -914,11 +1017,17 @@ const deleteMenuItem = async (req, res) => {
 
     await pool.execute('DELETE FROM MenuItem WHERE id = ?', [targetId]);
 
+    // Deactivate corresponding inventory item
+    try {
+      await pool.execute('UPDATE InventoryItem SET is_active = 0 WHERE product_id = ? OR LOWER(TRIM(name)) = ?', [targetId, item.name.trim().toLowerCase()]);
+    } catch (_) {}
+
     // Real-time broadcast so student-app & other screens immediately reflect deleted item
     try {
       const io = req.app.get('socketio');
       if (io) {
         io.emit('menu:updated', { item_id: targetId, deleted: true });
+        io.emit('inventory:stock_updated', { product_id: targetId, is_active: 0 });
       }
     } catch (socketErr) {
       console.warn('[deleteMenuItem] Socket emit warning:', socketErr.message);
@@ -1062,16 +1171,19 @@ const getMealWindows = async (req, res) => {
       console.warn('[MenuController] getMealWindows getAllMealSlots warning:', slotErr.message);
     }
 
+    const storeSlot = allSlots['store_hours'] || Object.values(allSlots).find((s) => s.is_full_day || (s.slots && s.slots.some((x) => x.start_datetime || x.is_active)));
+
     const formattedWindows = windows.map((w) => {
       const formatted = computeMealStatus(w, currentTime);
-      const slotData = allSlots[w.meal_type.toLowerCase()];
-      if (slotData && slotData.slots && slotData.slots.some((s) => s.start_datetime || s.is_active)) {
+      const slotData = storeSlot || allSlots[w.meal_type.toLowerCase()];
+      if (slotData && (slotData.is_full_day || (slotData.slots && slotData.slots.some((s) => s.start_datetime || s.is_active)) || slotData.custom_note)) {
         formatted.isAvailableNow = slotData.isAvailableNow;
         formatted.activeSlot = slotData.activeSlot;
         formatted.nextSlot = slotData.nextSlot;
         formatted.slots = slotData.slots;
         formatted.serving_note = slotData.serving_note;
         formatted.is_currently_open = slotData.isAvailableNow;
+        formatted.is_full_day = slotData.is_full_day;
       } else {
         formatted.isAvailableNow = formatted.is_currently_open;
         formatted.activeSlot = null;
@@ -1087,6 +1199,7 @@ const getMealWindows = async (req, res) => {
     return res.status(200).json({
       success: true,
       windows: formattedWindows,
+      store_timing: storeSlot || null,
       current_time: currentTime,
     });
   } catch (error) {
