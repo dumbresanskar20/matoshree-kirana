@@ -268,6 +268,142 @@ const getMenuItems = async (req, res) => {
       (t) => (windowMap[t] ? windowMap[t].is_active : true)
     );
 
+    const searchQuery = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+
+    if (searchQuery) {
+      let itemsSql = 'SELECT * FROM MenuItem WHERE is_active = 1';
+      const itemsParams = [];
+
+      const searchTerms = [searchQuery];
+      if (searchQuery === 'serials' || searchQuery === 'serial' || searchQuery === 'cereal' || searchQuery === 'cereals') {
+        searchTerms.push('grain', 'grains', 'pulses', 'pulse', 'atta', 'flour', 'dal');
+      } else if (searchQuery.includes('dairy') || searchQuery.includes('milk')) {
+        searchTerms.push('dairy', 'milk', 'ghee', 'paneer', 'cheese', 'butter', 'curd', 'dahi');
+      } else if (searchQuery.includes('oil')) {
+        searchTerms.push('oil', 'ghee', 'sunflower');
+      }
+
+      const clauses = searchTerms.map((term) => {
+        itemsParams.push(`%${term}%`, `%${term}%`, `%${term}%`, `%${term}%`);
+        return `(
+          LOWER(name) LIKE ? OR 
+          LOWER(COALESCE(category, meal_type, '')) LIKE ? OR 
+          LOWER(COALESCE(brand, '')) LIKE ? OR 
+          LOWER(COALESCE(description, '')) LIKE ?
+        )`;
+      });
+
+      itemsSql += ` AND (${clauses.join(' OR ')})`;
+      itemsSql += ' ORDER BY created_at DESC';
+
+      const [items] = await pool.execute(itemsSql, itemsParams);
+
+      if (items.length > 0) {
+        const menuItemIds = items.map((it) => it.id);
+        const placeholders = menuItemIds.map(() => '?').join(', ');
+        
+        let recipeRows = [];
+        try {
+          const [rows] = await pool.query(
+            `SELECT ri.*, ii.name AS inventory_item_name, ii.unit AS inventory_item_unit, 
+                    ii.quantity_in_stock AS inventory_item_quantity_in_stock, 
+                    ii.low_stock_threshold AS inventory_item_low_stock_threshold,
+                    ii.category AS inventory_item_category, ii.is_active AS inventory_item_is_active
+             FROM RecipeItem ri
+             INNER JOIN InventoryItem ii ON ri.inventory_item_id = ii.id
+             WHERE ri.menu_item_id IN (${placeholders})`,
+            menuItemIds
+          );
+          recipeRows = rows;
+        } catch (_) {
+          recipeRows = [];
+        }
+
+        let ratingMap = {};
+        try {
+          const [ratingRows] = await pool.query(
+            `SELECT menu_item_id, COUNT(*) AS rating_count, ROUND(AVG(rating), 1) AS avg_rating
+             FROM MenuItemReview
+             WHERE menu_item_id IN (${placeholders})
+             GROUP BY menu_item_id`,
+            menuItemIds
+          );
+          ratingRows.forEach((r) => {
+            ratingMap[r.menu_item_id] = {
+              avg_rating: Number(r.avg_rating) || 0,
+              rating_count: Number(r.rating_count) || 0,
+            };
+          });
+        } catch (e) {}
+
+        let salesMap = {};
+        try {
+          const [salesRows] = await pool.query(
+            `SELECT oi.menu_item_id, SUM(oi.quantity) AS total_sold
+             FROM OrderItem oi
+             LEFT JOIN \`Order\` o ON oi.order_id = o.id
+             WHERE oi.menu_item_id IN (${placeholders})
+               AND (o.id IS NULL OR o.payment_status = 'paid' OR o.status NOT IN ('cancelled', 'expired'))
+             GROUP BY oi.menu_item_id`,
+            menuItemIds
+          );
+          salesRows.forEach((s) => {
+            salesMap[s.menu_item_id] = Number(s.total_sold) || 0;
+          });
+        } catch (e) {}
+
+        const recipeItemsByMenuId = {};
+        recipeRows.forEach((row) => {
+          if (!recipeItemsByMenuId[row.menu_item_id]) {
+            recipeItemsByMenuId[row.menu_item_id] = [];
+          }
+          recipeItemsByMenuId[row.menu_item_id].push({
+            id: row.id,
+            menu_item_id: row.menu_item_id,
+            inventory_item_id: row.inventory_item_id,
+            quantity_required: row.quantity_required,
+            quantity_unit: row.quantity_unit,
+            inventory_item: {
+              id: row.inventory_item_id,
+              name: row.inventory_item_name,
+              unit: row.inventory_item_unit,
+              quantity_in_stock: row.inventory_item_quantity_in_stock,
+              low_stock_threshold: row.inventory_item_low_stock_threshold,
+              category: row.inventory_item_category,
+              is_active: row.inventory_item_is_active,
+            },
+          });
+        });
+
+        items.forEach((item) => {
+          item.recipe_items = recipeItemsByMenuId[item.id] || [];
+          item.avg_rating = ratingMap[item.id]?.avg_rating || 0;
+          item.rating_count = ratingMap[item.id]?.rating_count || 0;
+          item.total_sold = salesMap[item.id] || 0;
+        });
+      } else {
+        items.forEach((item) => {
+          item.recipe_items = [];
+          item.avg_rating = 0;
+          item.rating_count = 0;
+          item.total_sold = 0;
+        });
+      }
+
+      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled));
+      const sortedItems = sortMenuItemsByRatingAndSales(mappedItems);
+
+      return res.status(200).json({
+        success: true,
+        count: sortedItems.length,
+        items: sortedItems,
+        tracking_enabled: Boolean(trackingEnabled),
+        is_active: true,
+        is_currently_open: true,
+        search_query: searchQuery,
+      });
+    }
+
     if (meal_type) {
       const targetType = meal_type.toLowerCase();
       const status = storeSlot
@@ -411,9 +547,7 @@ const getMenuItems = async (req, res) => {
       const itemsParams = [];
       
       if (isStudentFetch) {
-        const placeholders = activeTypes.map(() => '?').join(', ');
-        itemsSql += ` WHERE meal_type IN (${placeholders}) AND is_active = 1`;
-        itemsParams.push(...activeTypes);
+        itemsSql += ' WHERE is_active = 1';
       }
       
       itemsSql += ' ORDER BY created_at DESC';

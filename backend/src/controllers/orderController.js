@@ -242,18 +242,106 @@ const cleanBaseItemName = (name) => {
 };
 
 /**
- * Computes exact deduction quantity based on the quantity the user ordered.
- * Adheres strictly to: deduct only the quantity which the user has ordered.
+ * Parses numeric amount and unit from a string like "500gm", "500 gm", "1.5 kg", "1kg", "500 ml", "1 litre", "2 packets".
  */
-const calculateOrderItemDeductQuantity = (orderItem, product) => {
-  return Math.max(1, Number(orderItem.quantity) || 1);
+const parseWeightOrVolumeString = (text) => {
+  if (!text || typeof text !== 'string') return null;
+  const clean = text.trim();
+  const lower = clean.toLowerCase();
+  if (lower === 'half' || lower === '1/2') return { amount: 0.5, unit: null };
+  if (lower === 'quarter' || lower === '1/4') return { amount: 0.25, unit: null };
+  if (lower === 'full' || lower === '1') return { amount: 1.0, unit: null };
+
+  const regex = /([0-9]+(?:\.[0-9]+)?)\s*(kg|kgs|kilo|kilogram|kilograms|g|gm|gms|gram|grams|l|ltr|liter|liters|litre|litres|ml|milli|millilitre|milliliter|packet|packets|pack|packs|piece|pieces|pc|pcs)?/i;
+  const match = clean.match(regex);
+  if (!match) return null;
+
+  const val = parseFloat(match[1]);
+  if (isNaN(val) || val <= 0) return null;
+
+  const rawUnit = (match[2] || '').toLowerCase().trim();
+  let normalizedUnit = null;
+  if (['kg', 'kgs', 'kilo', 'kilogram', 'kilograms'].includes(rawUnit)) normalizedUnit = 'kg';
+  else if (['g', 'gm', 'gms', 'gram', 'grams'].includes(rawUnit)) normalizedUnit = 'g';
+  else if (['l', 'ltr', 'litre', 'litres', 'liter', 'liters'].includes(rawUnit)) normalizedUnit = 'litre';
+  else if (['ml', 'millilitre', 'milliliter', 'milli'].includes(rawUnit)) normalizedUnit = 'ml';
+  else if (['packet', 'packets', 'pack', 'packs', 'pkt', 'pkts'].includes(rawUnit)) normalizedUnit = 'packet';
+  else if (['piece', 'pieces', 'pc', 'pcs'].includes(rawUnit)) normalizedUnit = 'piece';
+
+  return { amount: val, unit: normalizedUnit };
 };
 
 /**
- * Deducts ordered item counts from Total Inventory (both Product and InventoryItem tables)
- * immediately as the user places their order.
+ * Computes exact deduction quantity based on the quantity and variant the user ordered,
+ * converting units appropriately to match targetUnit (e.g. 500gm variant deducted from kg inventory = 0.5 kg).
+ * Ordering 2 quantity of 500gm will deduct 2 * 0.5 = 1.0 kg from inventory.
  */
-const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Placed') => {
+const calculateOrderItemDeductQuantity = (orderItem, product, targetUnit = null) => {
+  const orderQty = Math.max(0, Number(orderItem?.quantity) || 1);
+  const effectiveTarget = normalizeInventoryUnit(targetUnit || product?.unit || 'piece');
+
+  // 1. Try to find variant string from variant_name or item_name
+  let variantStr = orderItem?.variant_name || null;
+  if (!variantStr && orderItem?.item_name) {
+    const pMatch = orderItem.item_name.match(/\(([^)]+)\)/);
+    if (pMatch) variantStr = pMatch[1];
+  }
+
+  // 2. Also check product.variants if present
+  let matchedVariantObj = null;
+  if (product && product.variants) {
+    let vars = [];
+    try {
+      vars = typeof product.variants === 'string' ? JSON.parse(product.variants) : product.variants;
+    } catch (_) {}
+    if (Array.isArray(vars)) {
+      matchedVariantObj = vars.find(
+        (v) => (orderItem?.variant_name && String(v.name).toLowerCase() === String(orderItem.variant_name).toLowerCase()) ||
+               (variantStr && String(v.name).toLowerCase() === String(variantStr).toLowerCase()) ||
+               (v.id && (v.id === orderItem?.variant_id || v.id === orderItem?.variant?.id))
+      );
+    }
+  }
+
+  const parsed = parseWeightOrVolumeString(variantStr || matchedVariantObj?.name);
+
+  let unitMultiplier = 1;
+
+  if (parsed) {
+    const { amount, unit } = parsed;
+    if (unit === 'g') {
+      if (effectiveTarget === 'g') unitMultiplier = amount;
+      else unitMultiplier = amount / 1000; // e.g. 500g in kg is 0.5 kg
+    } else if (unit === 'kg') {
+      if (effectiveTarget === 'g') unitMultiplier = amount * 1000;
+      else unitMultiplier = amount; // in kg
+    } else if (unit === 'ml') {
+      if (effectiveTarget === 'ml') unitMultiplier = amount;
+      else unitMultiplier = amount / 1000; // e.g. 500ml in litre is 0.5 litre
+    } else if (unit === 'litre') {
+      if (effectiveTarget === 'ml') unitMultiplier = amount * 1000;
+      else unitMultiplier = amount;
+    } else if (unit === 'piece' || unit === 'packet') {
+      unitMultiplier = amount;
+    } else {
+      // unit is null (e.g. from Half/Full or raw number)
+      if (effectiveTarget === 'kg' && amount >= 50) unitMultiplier = amount / 1000;
+      else if (effectiveTarget === 'litre' && amount >= 50) unitMultiplier = amount / 1000;
+      else unitMultiplier = amount;
+    }
+  } else if (matchedVariantObj && typeof matchedVariantObj.quantity === 'number' && matchedVariantObj.quantity > 0) {
+    unitMultiplier = matchedVariantObj.quantity;
+  }
+
+  const totalDeduct = Math.round(orderQty * unitMultiplier * 1000) / 1000;
+  return Math.max(0, totalDeduct);
+};
+
+/**
+ * Deducts ordered item counts from Total Inventory (both Product/MenuItem and InventoryItem tables)
+ * strictly when the order is marked as 'delivered'.
+ */
+const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Delivered') => {
   try {
     // 1. Prevent duplicate deduction if already deducted
     const [existingLogs] = await db.query(
@@ -298,23 +386,28 @@ const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Pla
         product = pRows[0] || null;
       }
 
-      // Deduct ONLY the quantity which the user has ordered
-      const deductQty = calculateOrderItemDeductQuantity(item, product);
       const itemName = product?.name || cleanName || item.item_name;
 
-      // A. Deduct from Product table
+      // A. Deduct from Product / MenuItem table
+      const deductQtyProduct = calculateOrderItemDeductQuantity(item, product, product?.unit);
       if (product) {
         const currentStock = Number(product.stock_quantity !== undefined ? product.stock_quantity : (product.available_quantity || 100));
-        const newStock = Math.max(0, currentStock - deductQty);
+        const newStock = Math.max(0, Math.round((currentStock - deductQtyProduct) * 100) / 100);
         const newAvail = Math.max(0, Math.floor(newStock));
         const inStock = newStock > 0 ? 1 : 0;
 
+        await db.query(
+          `UPDATE MenuItem 
+           SET stock_quantity = ?, available_quantity = ?, is_available = ?, in_stock = ?
+           WHERE id = ?`,
+          [newStock, newAvail, inStock, inStock, product.id]
+        );
         await db.query(
           `UPDATE Product 
            SET stock_quantity = ?, available_quantity = ?, is_available = ?, in_stock = ?
            WHERE id = ?`,
           [newStock, newAvail, inStock, inStock, product.id]
-        );
+        ).catch(() => {});
       }
 
       // B. Deduct from InventoryItem table
@@ -341,11 +434,14 @@ const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Pla
         }
       }
 
+      const invUnit = invItem ? invItem.unit : (product?.unit || 'piece');
+      const deductQtyInv = calculateOrderItemDeductQuantity(item, product, invUnit);
+
       // Auto-register in InventoryItem if not existing yet (in same section)
       if (!invItem) {
         const unit = normalizeInventoryUnit(product?.unit || 'piece');
         const category = normalizeInventoryCategory(product?.category || product?.meal_type || 'groceries');
-        const initialStock = product ? Math.max(0, Number(product.stock_quantity || 100) - deductQty) : 0;
+        const initialStock = product ? Math.max(0, Math.round((Number(product.stock_quantity || 100) - deductQtyInv) * 1000) / 1000) : 0;
 
         const [maxRows] = await db.query(
           "SELECT MAX(CAST(SUBSTRING(unique_inventory_id, 5) AS UNSIGNED)) AS max_id FROM InventoryItem WHERE unique_inventory_id LIKE 'INV-%'"
@@ -366,7 +462,7 @@ const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Pla
         }
       } else {
         const currentInvStock = Number(invItem.quantity_in_stock);
-        const newInvStock = Math.max(0, currentInvStock - deductQty);
+        const newInvStock = Math.max(0, Math.round((currentInvStock - deductQtyInv) * 1000) / 1000);
 
         await db.query(
           'UPDATE InventoryItem SET quantity_in_stock = ? WHERE id = ?',
@@ -382,18 +478,18 @@ const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Pla
            VALUES (?, 'deduction', ?, ?, ?, ?)`,
           [
             invItem.id,
-            -deductQty,
+            -deductQtyInv,
             adminId || null,
             orderId,
-            reason ? `${reason} (Token ${tokenNumber})` : `Order ${tokenNumber} Placed`
+            reason ? `${reason} (Token ${tokenNumber})` : `Order ${tokenNumber} Delivered`
           ]
         );
       }
 
       deductionResults.push({
         item_name: itemName,
-        deducted: deductQty,
-        unit: product?.unit || invItem?.unit || 'unit',
+        deducted: deductQtyInv,
+        unit: invItem?.unit || product?.unit || 'unit',
         remaining_stock: invItem ? Number(invItem.quantity_in_stock) : undefined
       });
     }
@@ -408,7 +504,7 @@ const deductInventoryForOrder = async (db, orderId, adminId, reason = 'Order Pla
 const deductInventoryOnOrderDelivery = deductInventoryForOrder;
 
 /**
- * Restores deducted stock to both Product and InventoryItem if a delivered order is cancelled
+ * Restores deducted stock to both Product/MenuItem and InventoryItem if a delivered order is cancelled
  */
 const restoreInventoryOnOrderCancel = async (db, orderId, adminId) => {
   try {
@@ -428,10 +524,19 @@ const restoreInventoryOnOrderCancel = async (db, orderId, adminId) => {
         [qtyToRestore, log.inventory_item_id]
       );
 
-      // Restore Product
+      // Restore Product & MenuItem
       const [invRows] = await db.query('SELECT name FROM InventoryItem WHERE id = ? LIMIT 1', [log.inventory_item_id]);
       if (invRows.length > 0) {
         const name = invRows[0].name;
+        await db.query(
+          `UPDATE MenuItem 
+           SET stock_quantity = stock_quantity + ?,
+               available_quantity = available_quantity + ?,
+               is_available = 1,
+               in_stock = 1
+           WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))`,
+          [qtyToRestore, Math.ceil(qtyToRestore), name]
+        ).catch(() => {});
         await db.query(
           `UPDATE Product 
            SET stock_quantity = stock_quantity + ?,
@@ -440,8 +545,14 @@ const restoreInventoryOnOrderCancel = async (db, orderId, adminId) => {
                in_stock = 1
            WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))`,
           [qtyToRestore, Math.ceil(qtyToRestore), name]
-        );
+        ).catch(() => {});
       }
+
+      // Mark original deduction as cancelled so it cannot be restored twice
+      await db.query(
+        "UPDATE InventoryLog SET action_type = 'deduction_cancelled' WHERE id = ?",
+        [log.id]
+      );
 
       // Log restock action
       await db.query(
@@ -995,8 +1106,7 @@ const fulfillPaidOrder = async ({
       }
     }
 
-    // Deduct stock from InventoryItem and Product as the user orders the product
-    await deductInventoryForOrder(connection, finalOrderId, null, `Order #${finalTokenNumber} Placed`);
+    // Inventory is deducted only when the order is marked as 'delivered' by admin/staff
     await connection.commit();
   } catch (fulfillErr) {
     await connection.rollback();
@@ -1010,10 +1120,8 @@ const fulfillPaidOrder = async ({
   const shapedOrder = shapeOrder(updatedOrder);
   const orderCounts = await computeKitchenOrderCounts(updatedOrder.date);
 
-  // 7. Emit real-time updates to Kitchen, Students, and Stock listeners
+  // 7. Emit real-time updates to Kitchen & Students (stock events emitted upon delivery)
   if (io) {
-    io.emit('menu:stock_updated', { order_id: finalOrderId });
-    io.emit('inventory:stock_updated', { order_id: finalOrderId });
     const socketPayload = {
       _id: updatedOrder.id,
       id: updatedOrder.id,
@@ -1721,7 +1829,7 @@ const updateOrderStatus = async (req, res) => {
 
       // Deduct item count from Total Inventory upon successful delivery
       if (prevStatus !== 'delivered') {
-        const deductedResults = await deductInventoryOnOrderDelivery(pool, targetId, req.adminId);
+        const deductedResults = await deductInventoryOnOrderDelivery(pool, targetId, req.adminId, 'Order Delivered');
         console.log(`[OrderController] Inventory deducted on delivery for Order #${targetId}:`, deductedResults);
       }
     } else {
@@ -2574,8 +2682,7 @@ const createManualOrder = async (req, res) => {
         );
       }
 
-      // Deduct stock immediately from InventoryItem and Product as walk-in order is placed
-      await deductInventoryForOrder(connection, finalOrderId, req.adminId, `Walk-in Order #${finalTokenNumber} Placed`);
+      // Inventory is deducted only when the order is marked as 'delivered' by admin/staff
       await connection.commit();
     } catch (txErr) {
       await connection.rollback();
@@ -2620,7 +2727,6 @@ const createManualOrder = async (req, res) => {
       io.to('kitchen').emit('income:updated');
       io.emit('menu:sales_updated', { meal_type: createdOrder.meal_type });
       io.emit('menu:updated', { meal_type: createdOrder.meal_type });
-      io.emit('inventory:stock_updated', { order_id: finalOrderId });
     }
 
     return res.status(201).json({
@@ -2982,4 +3088,7 @@ module.exports = {
   getCurrentServerTimeHHMM,
   syncOrderSchema,
   getMenuReport,
+  calculateOrderItemDeductQuantity,
+  deductInventoryForOrder,
+  deductInventoryOnOrderDelivery,
 };

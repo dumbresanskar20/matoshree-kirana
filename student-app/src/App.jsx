@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Hero3D from './components/Hero3D';
 import MealTypeTabs from './components/MealTypeTabs';
@@ -14,11 +14,12 @@ import OrderDetailModal from './components/OrderDetailModal';
 import SubscriptionExpiredScreen from './components/SubscriptionExpiredScreen';
 import { useCart } from './context/CartContext';
 import { useAuth } from './context/AuthContext';
-import { Utensils, Clock, AlertCircle, Info, CheckCircle2, X } from 'lucide-react';
+import { Utensils, Clock, AlertCircle, Info, CheckCircle2, X, Search } from 'lucide-react';
 import CAFE_D_CRUZE_LOGO from './assets/logo';
 import api from './services/api';
 import { createSocketClient } from './services/socket';
 import { preloadImages } from './utils/imageCache';
+import { matchesProductSearch } from './utils/searchUtils';
 
 export default function App() {
   const {
@@ -43,6 +44,12 @@ export default function App() {
   const [backendStatus, setBackendStatus] = useState({ is_active: true, is_currently_open: true });
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [navbarHeight, setNavbarHeight] = useState(64);
+
+  // Search across all product types state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allProducts, setAllProducts] = useState([]);
+  const [backendSearchResults, setBackendSearchResults] = useState([]);
+  const [isSearchingBackend, setIsSearchingBackend] = useState(false);
 
   // Modals state
   const [successToken, setSuccessToken] = useState(null);
@@ -147,6 +154,22 @@ export default function App() {
     }
   };
 
+  const fetchAllProducts = useCallback(async () => {
+    try {
+      const res = await api.get('/menu/items?active_only=true');
+      if (res.data?.success && Array.isArray(res.data.items)) {
+        setAllProducts(res.data.items);
+        preloadImages(res.data.items.map((i) => i.image_url));
+      }
+    } catch (e) {
+      console.warn('Error prefetching all products for search:', e?.message || e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllProducts();
+  }, [fetchAllProducts]);
+
   // Check subscription status on mount, via periodic polling, and listen for 402 event
   useEffect(() => {
     checkSub();
@@ -170,6 +193,7 @@ export default function App() {
       setSubscriptionExpired(Boolean(isExp));
       if (!isExp) {
         fetchMenuItems(selectedMealTypeRef.current, true);
+        fetchAllProducts();
       }
     });
 
@@ -177,6 +201,7 @@ export default function App() {
     const handleLiveMenuUpdate = (data) => {
       console.log('[Student Socket] Live menu rating/sales update received:', data);
       fetchMenuItems(selectedMealTypeRef.current, true);
+      fetchAllProducts();
     };
 
     socket.on('menu:rating_updated', handleLiveMenuUpdate);
@@ -206,6 +231,7 @@ export default function App() {
     const handleLocalRating = () => {
       console.log('[Student Event] Local rating submitted, refreshing ranked menu...');
       fetchMenuItems(selectedMealTypeRef.current, true);
+      fetchAllProducts();
     };
 
     window.addEventListener('rating_submitted', handleLocalRating);
@@ -214,7 +240,7 @@ export default function App() {
       socket.disconnect();
       window.removeEventListener('rating_submitted', handleLocalRating);
     };
-  }, [fetchMenuItems]);
+  }, [fetchMenuItems, fetchAllProducts]);
 
   // Real-time Socket.IO listener for live student order updates
   useEffect(() => {
@@ -352,6 +378,73 @@ export default function App() {
   const formattedStartTime = currentMealWindow?.formatted_start_time || '08:00 AM';
   const formattedEndTime = currentMealWindow?.formatted_end_time || '08:00 PM';
 
+  // Debounced backend search for robust database-wide queries
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setBackendSearchResults([]);
+      setIsSearchingBackend(false);
+      return;
+    }
+
+    setIsSearchingBackend(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get(`/menu/items?search=${encodeURIComponent(q)}&active_only=true`);
+        if (res.data?.success && Array.isArray(res.data.items)) {
+          setBackendSearchResults(res.data.items);
+        }
+      } catch (err) {
+        console.warn('Backend search error:', err?.message || err);
+      } finally {
+        setIsSearchingBackend(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const isSearching = searchQuery.trim().length > 0;
+
+  const clientSearchResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [];
+    const pool = allProducts.length > 0 ? allProducts : menuItems;
+    return pool.filter((item) => matchesProductSearch(item, q));
+  }, [searchQuery, allProducts, menuItems]);
+
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [];
+    const map = new Map();
+    // 1. Client-side matches (instant with synonym mapping e.g. dairy -> milk/paneer/curd)
+    clientSearchResults.forEach((item) => {
+      const id = item._id || item.id;
+      if (id) map.set(String(id), item);
+    });
+    // 2. Server-side matches (handles server-expanded synonyms & db search)
+    backendSearchResults.forEach((item) => {
+      const id = item._id || item.id;
+      if (id && !map.has(String(id))) {
+        map.set(String(id), item);
+      }
+    });
+    return Array.from(map.values());
+  }, [isSearching, clientSearchResults, backendSearchResults]);
+
+  const displayedItems = isSearching ? searchResults : menuItems;
+
+  const isItemWindowOpen = useCallback(
+    (item) => {
+      if (!item?.meal_type) return isCurrentlyOpen;
+      const windowObj = activeMealWindows?.find(
+        (w) => (w.meal_type || '').toLowerCase() === (item.meal_type || '').toLowerCase()
+      );
+      if (!windowObj) return isCurrentlyOpen;
+      return Boolean(windowObj.is_currently_open);
+    },
+    [activeMealWindows, isCurrentlyOpen]
+  );
+
   if (subscriptionExpired) {
     return <SubscriptionExpiredScreen onRetry={checkSub} />;
   }
@@ -374,7 +467,12 @@ export default function App() {
       <Hero3D />
 
       {/* Sticky Meal Category Tabs directly below navbar */}
-      <MealTypeTabs navbarHeight={navbarHeight} />
+      <MealTypeTabs
+        navbarHeight={navbarHeight}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        totalResultsCount={isSearching ? displayedItems.length : null}
+      />
 
       {/* Main Menu Section */}
       <main id="menu-section" className="flex-1 max-w-screen-2xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10">
@@ -412,37 +510,76 @@ export default function App() {
             )}
 
             {/* Section Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 sm:mb-8 pb-3 sm:pb-4 border-b border-amber-200/60 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 sm:mb-8 pb-3 sm:pb-4 border-b border-amber-200/60 gap-3">
               <div>
                 <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-extrabold text-brand-orange uppercase tracking-wider bg-orange-100/80 px-2.5 sm:px-3 py-1 rounded-full mb-2">
-                  <Utensils className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5" />
-                  <span>Campus Mess Kitchen</span>
+                  {isSearching ? (
+                    <>
+                      <Search className="w-3.5 h-3.5" />
+                      <span>Search Across All Product Types</span>
+                    </>
+                  ) : (
+                    <>
+                      <Utensils className="w-3.5 h-3.5" />
+                      <span>Matoshree Kirana Store</span>
+                    </>
+                  )}
                 </div>
 
-                <h2 className="text-2xl sm:text-4xl font-extrabold font-display text-brand-dark tracking-tight">
-                  Today's <span className="text-brand-orange capitalize">{selectedMealType?.replace(/_/g, ' ')}</span> Menu
-                </h2>
-
-                {/* Operating Window Badge */}
-                {currentMealWindow && (
-                  <div className="mt-1.5 inline-flex items-center gap-2 text-xs font-bold flex-wrap">
-                    <Clock className="w-3.5 h-3.5 text-stone-500 shrink-0" />
-                    <span className="text-stone-600">
-                      {isFullDay ? '24/7 Full-Day Ordering' : `Window: ${formattedStartTime} – ${formattedEndTime}`}
-                    </span>
-
-                    {isCurrentlyOpen ? (
-                      <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-extrabold text-[10px] uppercase">
-                        Ordering Open
+                {isSearching ? (
+                  <div>
+                    <h2 className="text-2xl sm:text-4xl font-extrabold font-display text-brand-dark tracking-tight">
+                      Search Results for "<span className="text-brand-orange">{searchQuery}</span>"
+                    </h2>
+                    <div className="mt-1.5 flex items-center gap-2 text-xs font-bold flex-wrap">
+                      <span className="bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full font-extrabold text-xs">
+                        {displayedItems.length} {displayedItems.length === 1 ? 'product' : 'products'} found
                       </span>
-                    ) : (
-                      <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-extrabold text-[10px] uppercase">
-                        Ordering Closed
+                      <span className="text-stone-400">•</span>
+                      <span className="text-stone-600">
+                        Searched all categories (serials, grains, dairy, cooking essentials, snacks, flours, oils...)
                       </span>
-                    )}
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <h2 className="text-2xl sm:text-4xl font-extrabold font-display text-brand-dark tracking-tight">
+                      Today's <span className="text-brand-orange capitalize">{selectedMealType?.replace(/_/g, ' ')}</span> Menu
+                    </h2>
+
+                    {/* Operating Window Badge */}
+                    {currentMealWindow && (
+                      <div className="mt-1.5 inline-flex items-center gap-2 text-xs font-bold flex-wrap">
+                        <Clock className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                        <span className="text-stone-600">
+                          {isFullDay ? '24/7 Full-Day Ordering' : `Window: ${formattedStartTime} – ${formattedEndTime}`}
+                        </span>
+
+                        {isCurrentlyOpen ? (
+                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-extrabold text-[10px] uppercase">
+                            Ordering Open
+                          </span>
+                        ) : (
+                          <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-extrabold text-[10px] uppercase">
+                            Ordering Closed
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
+
+              {isSearching && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="self-start sm:self-auto px-4 py-2 bg-white hover:bg-amber-50 text-stone-700 hover:text-stone-900 rounded-xl border border-amber-200 text-xs sm:text-sm font-extrabold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <X className="w-4 h-4 text-stone-500" />
+                  <span>Clear Search</span>
+                </button>
+              )}
             </div>
 
             {/* Dynamic Meal Service / Distribution Notice (Visible only before set time) */}
@@ -458,7 +595,28 @@ export default function App() {
                   <div key={n} className="h-80 bg-white/70 rounded-3xl border border-stone-200" />
                 ))}
               </div>
-            ) : !backendStatus.is_active ? (
+            ) : isSearching && displayedItems.length === 0 ? (
+              <div className="text-center py-16 sm:py-20 bg-white/80 backdrop-blur-md rounded-3xl border border-dashed border-amber-200 px-4 space-y-3 max-w-xl mx-auto shadow-xs">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl mx-auto border border-amber-200/80">
+                  🔍
+                </div>
+                <h3 className="font-display font-extrabold text-stone-800 text-lg sm:text-xl">
+                  No products found for "{searchQuery}"
+                </h3>
+                <p className="text-xs sm:text-sm text-stone-500 max-w-md mx-auto">
+                  We searched across all store categories (grains, pulses, flours, dairy, oils, snacks, beverages, and personal care).
+                </p>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="px-4 py-2 bg-brand-dark hover:bg-stone-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+                  >
+                    Clear search & return to {selectedMealType?.replace(/_/g, ' ')}
+                  </button>
+                </div>
+              </div>
+            ) : !isSearching && !backendStatus.is_active ? (
               <div className="text-center py-12 sm:py-16 bg-amber-50/60 rounded-3xl border border-amber-200 space-y-2 px-4">
                 <AlertCircle className="w-8 h-8 text-amber-600 mx-auto" />
                 <p className="font-display font-bold text-stone-800 text-base sm:text-lg">
@@ -466,15 +624,19 @@ export default function App() {
                 </p>
                 <p className="text-xs text-stone-500">Please select another active category above.</p>
               </div>
-            ) : menuItems.length === 0 ? (
+            ) : !isSearching && menuItems.length === 0 ? (
               <div className="text-center py-12 sm:py-16 bg-white/60 rounded-3xl border border-dashed border-amber-200 px-4">
                 <p className="font-display font-bold text-stone-700 text-base sm:text-lg">No active items in this category right now.</p>
                 <p className="text-xs text-stone-500 mt-1">Please select another category above.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
-                {menuItems.map((item) => (
-                  <MenuCard key={item._id || item.id} item={item} isCurrentlyOpen={isCurrentlyOpen} />
+                {displayedItems.map((item) => (
+                  <MenuCard
+                    key={item._id || item.id}
+                    item={item}
+                    isCurrentlyOpen={isSearching ? isItemWindowOpen(item) : isCurrentlyOpen}
+                  />
                 ))}
               </div>
             )}

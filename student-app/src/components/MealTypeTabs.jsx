@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
-export default function MealTypeTabs({ navbarHeight = 64 }) {
+export default function MealTypeTabs({
+  navbarHeight = 64,
+  searchQuery = '',
+  setSearchQuery,
+  totalResultsCount = null,
+}) {
   const { selectedMealType, setSelectedMealType, activeMealWindows, loadingWindows } = useCart();
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
@@ -94,9 +99,13 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
     ? activeMealWindows.map((w) => {
         const type = (w.meal_type || '').toLowerCase();
         const meta = getMealMeta(type, w);
+        const resolvedLabel = (w.category_name && !w.category_name.includes('_'))
+          ? w.category_name
+          : meta.label || (w.category_name ? w.category_name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : meta.label);
+
         return {
           id: type,
-          label: w.category_name || meta.label,
+          label: resolvedLabel,
           icon: w.icon || meta.icon,
           isCurrentlyOpen: Boolean(w.is_currently_open),
           startTime: w.formatted_start_time,
@@ -160,7 +169,43 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
 
   const handleMealSelect = (typeId) => {
     setSelectedMealType(typeId);
+    if (setSearchQuery) {
+      setSearchQuery('');
+    }
   };
+
+  const renderSearchBar = () => (
+    <div className="relative w-full sm:w-72 md:w-80 lg:w-96 shrink-0">
+      <div className="relative flex items-center">
+        <span className="absolute left-3.5 flex items-center pointer-events-none text-stone-400">
+          <Search className="w-4 h-4 text-amber-600" />
+        </span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+          placeholder="Search all products (serials, dairy, oils...)"
+          className="w-full min-h-[44px] sm:min-h-[48px] pl-10 pr-10 py-2 sm:py-2.5 bg-white border border-amber-200/90 rounded-2xl text-xs sm:text-sm font-semibold text-stone-800 placeholder-stone-400 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all"
+        />
+        {searchQuery ? (
+          <button
+            type="button"
+            onClick={() => setSearchQuery && setSearchQuery('')}
+            className="absolute right-2.5 p-1 rounded-full text-stone-400 hover:text-stone-700 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer"
+            title="Clear search"
+            aria-label="Clear search"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        ) : null}
+      </div>
+      {searchQuery.trim() && totalResultsCount !== null && (
+        <div className="absolute -bottom-5 right-2 flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full shadow-2xs pointer-events-none">
+          <span>{totalResultsCount} found across all categories</span>
+        </div>
+      )}
+    </div>
+  );
 
   if (loadingWindows) {
     return (
@@ -190,31 +235,71 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
     >
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8">
         {!isCollapsible ? (
-          /* Case 1: <= 4 meal types -> Render normally in a responsive row */
-          <div
-            ref={tabsContainerRef}
-            className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 max-w-4xl mx-auto px-1 w-full"
-          >
-            {availableMealTypes.map((meal) => {
-              const isSelected = selectedMealType === meal.id;
-              const isOpen = meal.isCurrentlyOpen;
+          /* Case 1: <= 4 meal types -> Render beside search bar in responsive row */
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-4">
+            <div
+              ref={tabsContainerRef}
+              className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-0.5 min-w-0"
+            >
+              {availableMealTypes.map((meal) => {
+                const isSelected = selectedMealType === meal.id;
+                const isOpen = meal.isCurrentlyOpen;
 
-              return (
-                <button
-                  key={meal.id}
-                  ref={isSelected ? activeTabRef : null}
-                  onClick={() => handleMealSelect(meal.id)}
-                  className={`min-h-[44px] sm:min-h-[48px] px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 shadow-xs border cursor-pointer shrink-0 active:scale-95 ${
-                    isSelected
-                      ? 'bg-brand-dark text-white border-brand-dark shadow-md ring-2 ring-brand-orange/40 scale-[1.03]'
-                      : isOpen
-                      ? 'bg-white text-stone-700 border-amber-200/90 hover:border-amber-400 hover:bg-amber-50/50'
-                      : 'bg-stone-100/90 text-stone-500 border-stone-200 hover:bg-stone-200/60'
-                  }`}
-                >
-                  {/* Status Light Indicator */}
+                return (
+                  <button
+                    key={meal.id}
+                    ref={isSelected ? activeTabRef : null}
+                    onClick={() => handleMealSelect(meal.id)}
+                    className={`min-h-[44px] sm:min-h-[48px] px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 shadow-xs border cursor-pointer shrink-0 active:scale-95 ${
+                      isSelected
+                        ? 'bg-brand-dark text-white border-brand-dark shadow-md ring-2 ring-brand-orange/40 scale-[1.03]'
+                        : isOpen
+                        ? 'bg-white text-stone-700 border-amber-200/90 hover:border-amber-400 hover:bg-amber-50/50'
+                        : 'bg-stone-100/90 text-stone-500 border-stone-200 hover:bg-stone-200/60'
+                    }`}
+                  >
+                    {/* Status Light Indicator */}
+                    <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
+                      {isOpen ? (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-emerald-500" />
+                        </>
+                      ) : (
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-rose-500" />
+                      )}
+                    </span>
+
+                    <span className="text-sm sm:text-base">{meal.icon}</span>
+                    <span className="whitespace-nowrap">{meal.label}</span>
+
+                    {!isOpen && (
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                        Closed
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {renderSearchBar()}
+          </div>
+        ) : (
+          /* Case 2: > 4 meal types -> Category Dropdown pill beside search bar */
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4">
+            <div ref={dropdownRef} className="w-full sm:w-80 md:w-96 relative shrink-0">
+              {/* Minimized Pill Bar */}
+              <button
+                type="button"
+                onClick={() => setIsExpanded((prev) => !prev)}
+                className="w-full min-h-[44px] sm:min-h-[48px] px-4 sm:px-5 py-2 sm:py-2.5 bg-brand-dark text-white rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-between shadow-md hover:shadow-lg border border-brand-dark ring-2 ring-brand-orange/40 hover:ring-brand-orange/60 active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                aria-expanded={isExpanded}
+                aria-haspopup="true"
+                aria-label="Toggle meal categories dropdown"
+              >
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                   <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
-                    {isOpen ? (
+                    {currentSelectedMeal?.isCurrentlyOpen ? (
                       <>
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-emerald-500" />
@@ -223,134 +308,102 @@ export default function MealTypeTabs({ navbarHeight = 64 }) {
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-rose-500" />
                     )}
                   </span>
-
-                  <span className="text-sm sm:text-base">{meal.icon}</span>
-                  <span>{meal.label}</span>
-
-                  {!isOpen && (
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                  <span className="text-base sm:text-lg shrink-0">{currentSelectedMeal?.icon}</span>
+                  <span className="text-xs sm:text-sm font-black tracking-tight whitespace-nowrap">
+                    {currentSelectedMeal?.label}
+                  </span>
+                  {!currentSelectedMeal?.isCurrentlyOpen && (
+                    <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-500/30 shrink-0">
                       Closed
                     </span>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          /* Case 2: > 4 meal types -> Minimized button with dropdown for desktop and mobile */
-          <div ref={dropdownRef} className="w-full max-w-md sm:max-w-lg mx-auto relative">
-            {/* Minimized Pill Bar */}
-            <button
-              type="button"
-              onClick={() => setIsExpanded((prev) => !prev)}
-              className="w-full min-h-[46px] sm:min-h-[50px] px-4 sm:px-5 py-2 sm:py-2.5 bg-brand-dark text-white rounded-2xl font-extrabold text-xs sm:text-sm flex items-center justify-between shadow-md hover:shadow-lg border border-brand-dark ring-2 ring-brand-orange/40 hover:ring-brand-orange/60 active:scale-[0.99] transition-all duration-200 cursor-pointer"
-              aria-expanded={isExpanded}
-              aria-haspopup="true"
-              aria-label="Toggle meal categories dropdown"
-            >
-              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0">
-                  {currentSelectedMeal?.isCurrentlyOpen ? (
-                    <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-emerald-500" />
-                    </>
-                  ) : (
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-rose-500" />
-                  )}
-                </span>
-                <span className="text-base sm:text-lg shrink-0">{currentSelectedMeal?.icon}</span>
-                <span className="text-xs sm:text-sm font-black tracking-tight truncate">
-                  {currentSelectedMeal?.label}
-                </span>
-                {!currentSelectedMeal?.isCurrentlyOpen && (
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-500/30 shrink-0">
-                    Closed
-                  </span>
-                )}
-              </div>
+                </div>
 
-              <div className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-amber-200 text-xs sm:text-sm font-black shrink-0 transition-colors">
-                <span>All ({availableMealTypes.length})</span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                />
-              </div>
-            </button>
+                <div className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-amber-200 text-xs sm:text-sm font-black shrink-0 transition-colors ml-2">
+                  <span>All ({availableMealTypes.length})</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                  />
+                </div>
+              </button>
 
-            {/* Dropdown Menu Overlay */}
-            {isExpanded && (
-              <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white/95 backdrop-blur-md rounded-3xl border-2 border-amber-300/90 shadow-2xl p-3 sm:p-4 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between mb-2.5 sm:mb-3 pb-2 border-b border-amber-100">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm font-black text-stone-900 tracking-wide uppercase">
-                      Meal Categories
-                    </span>
-                    <span className="bg-amber-100 text-amber-900 text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full">
-                      {availableMealTypes.length} Available
-                    </span>
+              {/* Dropdown Menu Overlay */}
+              {isExpanded && (
+                <div className="absolute top-full left-0 right-0 sm:w-80 md:w-96 mt-2 z-50 bg-white/95 backdrop-blur-md rounded-3xl border-2 border-amber-300/90 shadow-2xl p-3 sm:p-4 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center justify-between mb-2.5 sm:mb-3 pb-2 border-b border-amber-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm font-black text-stone-900 tracking-wide uppercase">
+                        Product Categories
+                      </span>
+                      <span className="bg-amber-100 text-amber-900 text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full">
+                        {availableMealTypes.length} Available
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded(false)}
+                      className="px-2.5 sm:px-3 py-1 rounded-xl text-stone-600 hover:text-stone-900 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1 text-xs sm:text-sm font-black"
+                    >
+                      <span>Close</span>
+                      <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(false)}
-                    className="px-2.5 sm:px-3 py-1 rounded-xl text-stone-600 hover:text-stone-900 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1 text-xs sm:text-sm font-black"
-                  >
-                    <span>Close</span>
-                    <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
+
+                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5 max-h-[55vh] sm:max-h-[60vh] overflow-y-auto pr-0.5">
+                    {availableMealTypes.map((meal) => {
+                      const isSelected = selectedMealType === meal.id;
+                      const isOpen = meal.isCurrentlyOpen;
+
+                      return (
+                        <button
+                          key={meal.id}
+                          type="button"
+                          onClick={() => {
+                            handleMealSelect(meal.id);
+                            setIsExpanded(false);
+                          }}
+                          className={`min-h-[46px] sm:min-h-[50px] px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all duration-150 flex items-center justify-between gap-1.5 shadow-2xs border cursor-pointer active:scale-95 text-left ${
+                            isSelected
+                              ? 'bg-brand-dark text-white border-brand-dark shadow-md ring-2 ring-brand-orange/40'
+                              : isOpen
+                              ? 'bg-amber-50/50 text-stone-700 border-amber-200/90 hover:border-amber-400 hover:bg-amber-100/60'
+                              : 'bg-stone-50 text-stone-400 border-stone-200 hover:bg-stone-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0">
+                              {isOpen ? (
+                                <>
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-500" />
+                                </>
+                              ) : (
+                                <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-rose-500" />
+                              )}
+                            </span>
+                            <span className="text-base sm:text-lg shrink-0">{meal.icon}</span>
+                            <span className="truncate">{meal.label}</span>
+                          </div>
+
+                          {isSelected ? (
+                            <span className="text-brand-orange text-xs sm:text-sm font-black shrink-0">●</span>
+                          ) : !isOpen ? (
+                            <span className="text-[8px] sm:text-[9px] font-black uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 shrink-0">
+                              Closed
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+            </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:gap-2.5 max-h-[55vh] sm:max-h-[60vh] overflow-y-auto pr-0.5">
-                  {availableMealTypes.map((meal) => {
-                    const isSelected = selectedMealType === meal.id;
-                    const isOpen = meal.isCurrentlyOpen;
-
-                    return (
-                      <button
-                        key={meal.id}
-                        type="button"
-                        onClick={() => {
-                          handleMealSelect(meal.id);
-                          setIsExpanded(false);
-                        }}
-                        className={`min-h-[46px] sm:min-h-[50px] px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all duration-150 flex items-center justify-between gap-1.5 shadow-2xs border cursor-pointer active:scale-95 text-left ${
-                          isSelected
-                            ? 'bg-brand-dark text-white border-brand-dark shadow-md ring-2 ring-brand-orange/40'
-                            : isOpen
-                            ? 'bg-amber-50/50 text-stone-700 border-amber-200/90 hover:border-amber-400 hover:bg-amber-100/60'
-                            : 'bg-stone-50 text-stone-400 border-stone-200 hover:bg-stone-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0">
-                            {isOpen ? (
-                              <>
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-500" />
-                              </>
-                            ) : (
-                              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-rose-500" />
-                            )}
-                          </span>
-                          <span className="text-base sm:text-lg shrink-0">{meal.icon}</span>
-                          <span className="truncate">{meal.label}</span>
-                        </div>
-
-                        {isSelected ? (
-                          <span className="text-brand-orange text-xs sm:text-sm font-black shrink-0">●</span>
-                        ) : !isOpen ? (
-                          <span className="text-[8px] sm:text-[9px] font-black uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 shrink-0">
-                            Closed
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Right: Search Bar beside Category dropdown */}
+            {renderSearchBar()}
           </div>
         )}
 
