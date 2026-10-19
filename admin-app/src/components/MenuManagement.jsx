@@ -62,12 +62,72 @@ export default function MenuManagement() {
     return [];
   };
 
+  const normalizeCategory = (cat) => {
+    if (!cat) return '';
+    const lower = String(cat).toLowerCase().trim();
+    if (lower === 'grains & pulses' || lower === 'grains_pulses' || lower === 'grain_pulses' || lower === 'grains and pulses' || lower === 'grains') {
+      return 'grains_pulses';
+    }
+    if (lower === 'cooking essentials' || lower === 'cooking_essential' || lower === 'cooking_essentials' || lower === 'cooking essential') {
+      return 'cooking_essentials';
+    }
+    if (lower === 'groceries & staples' || lower === 'groceries_staples' || lower === 'groceries' || lower === 'grocery') {
+      return 'groceries';
+    }
+    if (lower === 'atta, flours & grains' || lower === 'atta flours grains' || lower === 'flours_grains' || lower === 'flours & grains') {
+      return 'flours_grains';
+    }
+    if (lower === 'dals & pulses' || lower === 'dals_pulses' || lower === 'dal_pulses') {
+      return 'dals_pulses';
+    }
+    if (lower === 'edible oils & ghee' || lower === 'oils_ghee' || lower === 'oil_ghee' || lower === 'oils & ghee') {
+      return 'oils_ghee';
+    }
+    if (lower === 'spices & masalas' || lower === 'spices_masalas' || lower === 'spice_masala') {
+      return 'spices_masalas';
+    }
+    if (lower === 'dairy & eggs' || lower === 'dairy_eggs' || lower === 'dairy and eggs') {
+      return 'dairy_eggs';
+    }
+    if (lower === 'snacks & beverages' || lower === 'snacks_beverages' || lower === 'snack_beverages') {
+      return 'snacks_beverages';
+    }
+    if (lower === 'personal care' || lower === 'personal_care') {
+      return 'personal_care';
+    }
+    if (lower === 'cleaning & household' || lower === 'cleaning_household' || lower === 'household') {
+      return 'household';
+    }
+    if (lower === 'daily essentials' || lower === 'daily_essentials' || lower === 'daily essential') {
+      return 'daily_essentials';
+    }
+    return lower.replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'groceries';
+  };
+
   const formatCategoryName = (name) => {
     if (!name) return '';
-    const lower = name.toLowerCase().trim();
-    if (lower === 'grains_pulses' || lower === 'grains & pulses') return 'Grains & Pulses';
-    if (lower === 'cooking_essential' || lower === 'cooking_essentials' || lower === 'cooking essentials') return 'Cooking Essentials';
-    return name.replace(/_/g, ' ');
+    const clean = normalizeCategory(name);
+    const titleMap = {
+      grains_pulses: 'Grains & Pulses',
+      cooking_essentials: 'Cooking Essentials',
+      cooking_essential: 'Cooking Essentials',
+      groceries: 'Groceries & Staples',
+      flours_grains: 'Atta, Flours & Grains',
+      dals_pulses: 'Dals & Pulses',
+      oils_ghee: 'Edible Oils & Ghee',
+      spices_masalas: 'Spices & Masalas',
+      dairy_eggs: 'Dairy & Eggs',
+      snacks_beverages: 'Snacks & Beverages',
+      personal_care: 'Personal Care',
+      household: 'Cleaning & Household',
+      daily_essentials: 'Daily Essentials',
+      breakfast: 'Breakfast Essentials',
+      lunch: 'Lunch Essentials',
+      snacks: 'Evening Snacks',
+      dinner: 'Dinner Essentials',
+    };
+    if (titleMap[clean]) return titleMap[clean];
+    return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const [notification, setNotification] = useState(null);
@@ -90,6 +150,9 @@ export default function MenuManagement() {
           fetchMenuItems();
           fetchInventoryItems();
         });
+        socket.on('menu:updated', () => {
+          fetchMenuItems();
+        });
       } catch (e) {
         console.error('Socket init error in MenuManagement:', e);
       }
@@ -107,11 +170,14 @@ export default function MenuManagement() {
       const res = await api.get('/menu/windows');
       if (res.data && res.data.windows) {
         const types = res.data.windows
-          .map((w) => (w.meal_type || '').toLowerCase())
+          .map((w) => normalizeCategory(w.meal_type))
           .filter(Boolean);
-        setMealTypes(types);
-        if (!mealType && types.length > 0) {
-          setMealType(types[0]);
+        const unique = Array.from(new Set(types));
+        if (unique.length > 0) {
+          setMealTypes(unique);
+          if (!mealType) {
+            setMealType(filterMeal ? normalizeCategory(filterMeal) : unique[0]);
+          }
         }
       }
     } catch (err) {
@@ -139,7 +205,7 @@ export default function MenuManagement() {
     setLoading(true);
     try {
       let url = '/menu/items';
-      if (filterMeal) url += `?meal_type=${filterMeal}`;
+      if (filterMeal) url += `?meal_type=${encodeURIComponent(filterMeal)}`;
       const res = await api.get(url);
       if (res.data.success) {
         const fetchedItems = res.data.items || [];
@@ -147,13 +213,10 @@ export default function MenuManagement() {
         preloadImages(fetchedItems.map((i) => i.image_url));
 
         const itemCats = fetchedItems
-          .map((i) => (i.meal_type || i.category || '').toLowerCase())
-          .filter((t) => Boolean(t) && !['breakfast', 'lunch', 'snacks', 'dinner'].includes(t));
+          .map((i) => normalizeCategory(i.meal_type || i.category))
+          .filter(Boolean);
         if (itemCats.length > 0) {
-          setMealTypes((prev) => {
-            const merged = Array.from(new Set([...prev, ...itemCats]));
-            return merged;
-          });
+          setMealTypes((prev) => Array.from(new Set([...prev, ...itemCats])));
         }
       }
     } catch (err) {
@@ -163,11 +226,14 @@ export default function MenuManagement() {
     }
   };
 
-  const openAddModal = () => {
+  const openAddModal = (defaultCategory) => {
     setEditingItem(null);
     setName('');
     setPrice('');
-    setMealType(mealTypes[0] || 'General');
+    const targetCat = (typeof defaultCategory === 'string' && defaultCategory)
+      ? normalizeCategory(defaultCategory)
+      : (filterMeal ? normalizeCategory(filterMeal) : (mealTypes.length > 0 ? mealTypes[0] : 'grains_pulses'));
+    setMealType(targetCat);
     setUnit('piece');
     setStockQuantity('100');
     setImageUrl('');
@@ -183,9 +249,13 @@ export default function MenuManagement() {
 
   const openEditModal = (item) => {
     setEditingItem(item);
-    setName(item.name);
-    setPrice(item.price.toString());
-    setMealType(item.meal_type);
+    setName(item.name || '');
+    setPrice((item.price != null ? item.price : '').toString());
+    const itemCat = normalizeCategory(item.meal_type || item.category || 'groceries');
+    setMealType(itemCat);
+    if (itemCat && !mealTypes.includes(itemCat)) {
+      setMealTypes((prev) => [...prev, itemCat]);
+    }
     setUnit(item.unit || 'piece');
     setStockQuantity(String(item.stock_quantity ?? item.available_quantity ?? 100));
     setImageUrl(item.image_url || '');
@@ -271,10 +341,12 @@ export default function MenuManagement() {
     setSaving(true);
 
     try {
+      const resolvedCat = normalizeCategory(mealType);
       const formData = new FormData();
       formData.append('name', name.trim());
       formData.append('price', effectivePrice);
-      formData.append('meal_type', mealType);
+      formData.append('meal_type', resolvedCat);
+      formData.append('category', resolvedCat);
       formData.append('unit', unit || 'piece');
       formData.append('stock_quantity', stockQuantity !== '' ? stockQuantity : '100');
       formData.append('description', description);
@@ -320,15 +392,17 @@ export default function MenuManagement() {
       };
 
       if (editingItem) {
-        await api.put(`/menu/items/${editingItem._id}`, formData, config);
-        showToast(`Item '${name}' saved successfully!`);
+        const itemId = editingItem.id || editingItem._id;
+        await api.put(`/menu/items/${itemId}`, formData, config);
+        showToast(`Item '${name}' updated successfully!`);
       } else {
         await api.post('/menu/items', formData, config);
-        showToast(`New item '${name}' added to menu!`);
+        showToast(`New item '${name}' added to ${formatCategoryName(resolvedCat)}!`);
       }
 
       setIsModalOpen(false);
-      fetchMenuItems();
+      await fetchMenuItems();
+      await fetchMealTypes();
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Image upload failed — please try a smaller file or check your connection.';
       showToast(errMsg, 'error');
@@ -553,7 +627,7 @@ export default function MenuManagement() {
 
           <button
             type="button"
-            onClick={openAddModal}
+            onClick={() => openAddModal(filterMeal)}
             className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm px-5 py-3 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-5 h-5" />
@@ -606,8 +680,16 @@ export default function MenuManagement() {
       {loading ? (
         <div className="text-center py-16 text-slate-400 font-bold">Loading product catalog...</div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-          <p className="font-bold text-slate-600">No products found for this category.</p>
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-6 space-y-3">
+          <p className="font-bold text-slate-600">No products found for {filterMeal ? formatCategoryName(filterMeal) : 'this category'}.</p>
+          <button
+            type="button"
+            onClick={() => openAddModal(filterMeal)}
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Product to {filterMeal ? formatCategoryName(filterMeal) : 'Store'}</span>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -638,7 +720,7 @@ export default function MenuManagement() {
 
                     {/* Meal Type Badge */}
                     <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-xs text-white text-[11px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-xs">
-                      {item.category_name || formatCategoryName(item.meal_type)}
+                      {formatCategoryName(item.category_name || item.meal_type || item.category)}
                     </div>
 
                     {/* Inactive Overlay Pill */}
@@ -1094,7 +1176,7 @@ export default function MenuManagement() {
                       if (e.target.value === '__create_new__') {
                         setIsNewMealTypeModalOpen(true);
                       } else {
-                        setMealType(e.target.value);
+                        setMealType(normalizeCategory(e.target.value));
                       }
                     }}
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 outline-none font-medium capitalize"

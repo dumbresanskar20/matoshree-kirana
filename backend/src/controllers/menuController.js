@@ -24,6 +24,134 @@ const DEFAULT_SERVING_START_TIMES = {
   dinner: '19:30',
 };
 
+// Canonical category slug normalizer
+const normalizeCategoryCode = (cat) => {
+  if (!cat) return 'groceries';
+  const lower = String(cat).toLowerCase().trim();
+  if (lower === 'grains & pulses' || lower === 'grains_pulses' || lower === 'grain_pulses' || lower === 'grains and pulses' || lower === 'grains') {
+    return 'grains_pulses';
+  }
+  if (lower === 'cooking essentials' || lower === 'cooking_essential' || lower === 'cooking_essentials' || lower === 'cooking essential') {
+    return 'cooking_essentials';
+  }
+  if (lower === 'groceries & staples' || lower === 'groceries_staples' || lower === 'groceries' || lower === 'grocery') {
+    return 'groceries';
+  }
+  if (lower === 'atta, flours & grains' || lower === 'atta flours grains' || lower === 'flours_grains' || lower === 'flours & grains') {
+    return 'flours_grains';
+  }
+  if (lower === 'dals & pulses' || lower === 'dals_pulses' || lower === 'dal_pulses') {
+    return 'dals_pulses';
+  }
+  if (lower === 'edible oils & ghee' || lower === 'oils_ghee' || lower === 'oil_ghee' || lower === 'oils & ghee') {
+    return 'oils_ghee';
+  }
+  if (lower === 'spices & masalas' || lower === 'spices_masalas' || lower === 'spice_masala') {
+    return 'spices_masalas';
+  }
+  if (lower === 'dairy & eggs' || lower === 'dairy_eggs' || lower === 'dairy and eggs') {
+    return 'dairy_eggs';
+  }
+  if (lower === 'snacks & beverages' || lower === 'snacks_beverages' || lower === 'snack_beverages') {
+    return 'snacks_beverages';
+  }
+  if (lower === 'personal care' || lower === 'personal_care') {
+    return 'personal_care';
+  }
+  if (lower === 'cleaning & household' || lower === 'cleaning_household' || lower === 'household') {
+    return 'household';
+  }
+  if (lower === 'daily essentials' || lower === 'daily_essentials' || lower === 'daily essential') {
+    return 'daily_essentials';
+  }
+  return lower.replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'groceries';
+};
+
+// Display name formatter for Kirana store categories
+const formatCategoryTitle = (code) => {
+  if (!code) return '';
+  const lower = String(code).toLowerCase().trim();
+  const titleMap = {
+    grains_pulses: 'Grains & Pulses',
+    cooking_essentials: 'Cooking Essentials',
+    cooking_essential: 'Cooking Essentials',
+    groceries: 'Groceries & Staples',
+    flours_grains: 'Atta, Flours & Grains',
+    dals_pulses: 'Dals & Pulses',
+    oils_ghee: 'Edible Oils & Ghee',
+    spices_masalas: 'Spices & Masalas',
+    dairy_eggs: 'Dairy & Eggs',
+    snacks_beverages: 'Snacks & Beverages',
+    personal_care: 'Personal Care',
+    household: 'Cleaning & Household',
+    daily_essentials: 'Daily Essentials',
+    breakfast: 'Breakfast Essentials',
+    lunch: 'Lunch Essentials',
+    snacks: 'Evening Snacks',
+    dinner: 'Dinner Essentials',
+  };
+  if (titleMap[lower]) return titleMap[lower];
+  return lower.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+// Aliases generator to ensure backward compatibility across query variations
+const getCategoryAliases = (cat) => {
+  if (!cat) return ['groceries'];
+  const clean = normalizeCategoryCode(cat);
+  const aliases = new Set([clean, String(cat).toLowerCase().trim()]);
+  if (clean === 'grains_pulses') {
+    aliases.add('grains & pulses');
+    aliases.add('grains and pulses');
+    aliases.add('grain_pulses');
+    aliases.add('grains_pulses');
+    aliases.add('grains');
+  } else if (clean === 'cooking_essentials') {
+    aliases.add('cooking_essential');
+    aliases.add('cooking_essentials');
+    aliases.add('cooking essentials');
+    aliases.add('cooking essential');
+  } else if (clean === 'oils_ghee') {
+    aliases.add('edible oils & ghee');
+    aliases.add('oils_ghee');
+    aliases.add('oil_ghee');
+    aliases.add('oils & ghee');
+  } else if (clean === 'flours_grains') {
+    aliases.add('atta, flours & grains');
+    aliases.add('atta flours grains');
+    aliases.add('flours_grains');
+    aliases.add('flours & grains');
+  } else if (clean === 'dals_pulses') {
+    aliases.add('dals & pulses');
+    aliases.add('dals_pulses');
+  } else if (clean === 'spices_masalas') {
+    aliases.add('spices & masalas');
+    aliases.add('spices_masalas');
+  } else if (clean === 'dairy_eggs') {
+    aliases.add('dairy & eggs');
+    aliases.add('dairy_eggs');
+    aliases.add('dairy and eggs');
+  } else if (clean === 'snacks_beverages') {
+    aliases.add('snacks & beverages');
+    aliases.add('snacks_beverages');
+  } else if (clean === 'personal_care') {
+    aliases.add('personal care');
+    aliases.add('personal_care');
+  } else if (clean === 'household') {
+    aliases.add('cleaning & household');
+    aliases.add('household');
+    aliases.add('cleaning_household');
+  } else if (clean === 'daily_essentials') {
+    aliases.add('daily essentials');
+    aliases.add('daily_essentials');
+  } else if (clean === 'groceries') {
+    aliases.add('groceries & staples');
+    aliases.add('groceries');
+    aliases.add('grocery');
+  }
+  return Array.from(aliases);
+};
+
+
 const computeMealStatus = (w, currentTime = getCurrentTimeHHMM()) => {
   const isActive = Boolean(
     w.is_active === 1 ||
@@ -93,7 +221,7 @@ const convertToInventoryBaseUnit = (quantity, recipeUnit, inventoryUnit) => {
   return q;
 };
 
-const mapMenuItem = (record, req, trackingEnabled = false) => {
+const mapMenuItem = (record, req, trackingEnabled = false, categoryNameMap = {}) => {
   let isInStock = Boolean(record.is_available !== 0);
   let outOfStockReason = null;
   const outOfStockIngredients = [];
@@ -145,14 +273,19 @@ const mapMenuItem = (record, req, trackingEnabled = false) => {
     parsedVariants.length > 0
   );
 
+  const rawCat = record.category || record.meal_type || 'groceries';
+  const cleanCat = normalizeCategoryCode(rawCat);
+  const resolvedCategoryName = categoryNameMap[cleanCat] || formatCategoryTitle(cleanCat);
+
   return {
     ...record,
     _id: record.id,
     image_url: formatPublicImageUrl(record.image_url, req),
     price: Number(record.price),
     mrp: record.mrp ? Number(record.mrp) : Number(record.price),
-    category: record.category || record.meal_type,
-    category_name: record.category_name || (record.category === 'grains_pulses' || record.meal_type === 'grains_pulses' ? 'Grains & Pulses' : record.category || record.meal_type),
+    category: cleanCat,
+    meal_type: cleanCat,
+    category_name: resolvedCategoryName,
     unit: record.unit || 'piece',
     brand: record.brand || null,
     barcode: record.barcode || null,
@@ -239,7 +372,11 @@ const getMenuItems = async (req, res) => {
     const storeSlot = allSlots['store_hours'] || Object.values(allSlots).find((s) => s.is_full_day || (s.slots && s.slots.some((x) => x.start_datetime || x.is_active)));
 
     const windowMap = {};
+    const categoryNameMap = {};
     windows.forEach((w) => {
+      const code = normalizeCategoryCode(w.meal_type);
+      categoryNameMap[code] = w.category_name || formatCategoryTitle(code);
+
       const formatted = computeMealStatus(w, currentTime);
       const slotData = storeSlot || allSlots[w.meal_type.toLowerCase()];
       if (slotData && (slotData.is_full_day || (slotData.slots && slotData.slots.some((s) => s.start_datetime || s.is_active)) || slotData.custom_note)) {
@@ -260,6 +397,7 @@ const getMenuItems = async (req, res) => {
           : 'Not available right now';
       }
       windowMap[w.meal_type.toLowerCase()] = formatted;
+      windowMap[code] = formatted;
     });
 
     const windowMealTypes = windows.map((w) => (w.meal_type || '').toLowerCase().trim()).filter(Boolean);
@@ -390,7 +528,7 @@ const getMenuItems = async (req, res) => {
         });
       }
 
-      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled));
+      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled, categoryNameMap));
       const sortedItems = sortMenuItemsByRatingAndSales(mappedItems);
 
       return res.status(200).json({
@@ -406,9 +544,10 @@ const getMenuItems = async (req, res) => {
 
     if (meal_type) {
       const targetType = meal_type.toLowerCase();
+      const cleanTarget = normalizeCategoryCode(targetType);
       const status = storeSlot
         ? { is_active: storeSlot.isAvailableNow || storeSlot.is_full_day, is_currently_open: storeSlot.isAvailableNow }
-        : (windowMap[targetType] || { is_active: true, is_currently_open: true });
+        : (windowMap[cleanTarget] || windowMap[targetType] || { is_active: true, is_currently_open: true });
 
       if (isStudentFetch && !status.is_active) {
         return res.status(200).json({
@@ -421,12 +560,10 @@ const getMenuItems = async (req, res) => {
         });
       }
 
-      let itemsSql = 'SELECT * FROM MenuItem WHERE (meal_type = ? OR category = ?)';
-      let itemsParams = [targetType, targetType];
-      if (targetType === 'cooking_essential' || targetType === 'cooking_essentials' || targetType === 'cooking essentials') {
-        itemsSql = 'SELECT * FROM MenuItem WHERE (meal_type IN (?, ?) OR category IN (?, ?, ?))';
-        itemsParams = ['cooking_essential', 'cooking_essentials', 'cooking_essential', 'cooking_essentials', 'Cooking Essentials'];
-      }
+      const aliases = getCategoryAliases(targetType);
+      const placeholders = aliases.map(() => '?').join(', ');
+      let itemsSql = `SELECT * FROM MenuItem WHERE (LOWER(meal_type) IN (${placeholders}) OR LOWER(category) IN (${placeholders}))`;
+      let itemsParams = [...aliases, ...aliases];
       if (isStudentFetch) {
         itemsSql += ' AND is_active = 1';
       }
@@ -530,7 +667,7 @@ const getMenuItems = async (req, res) => {
         });
       }
 
-      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled));
+      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled, categoryNameMap));
       const sortedItems = sortMenuItemsByRatingAndSales(mappedItems);
 
       return res.status(200).json({
@@ -650,7 +787,7 @@ const getMenuItems = async (req, res) => {
         });
       }
 
-      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled));
+      const mappedItems = items.map((it) => mapMenuItem(it, req, trackingEnabled, categoryNameMap));
       const sortedItems = sortMenuItemsByRatingAndSales(mappedItems);
 
       return res.status(200).json({
@@ -688,8 +825,9 @@ const createMenuItem = async (req, res) => {
       variants,
     } = req.body;
 
-    const resolvedCategory = (category || meal_type || 'grocery').toString().toLowerCase().trim();
-    const resolvedMealType = (meal_type || category || 'grocery').toString().toLowerCase().trim();
+    const cleanCat = normalizeCategoryCode(category || meal_type || 'groceries');
+    const resolvedCategory = cleanCat;
+    const resolvedMealType = cleanCat;
 
     if (!name || price === undefined) {
       if (req.file && req.file.relativeUrl) {
@@ -886,6 +1024,9 @@ const createMenuItem = async (req, res) => {
       item: {
         ...item,
         _id: item.id,
+        category: cleanCat,
+        meal_type: cleanCat,
+        category_name: formatCategoryTitle(cleanCat),
         image_url: formatPublicImageUrl(item.image_url, req),
       },
     });
@@ -914,7 +1055,13 @@ const updateMenuItem = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Menu item not found.' });
     }
 
-    if (updates.meal_type) updates.meal_type = updates.meal_type.toLowerCase();
+    if (updates.meal_type !== undefined || updates.category !== undefined) {
+      const targetCategory = normalizeCategoryCode(
+        updates.category || updates.meal_type || existingItem.category || existingItem.meal_type
+      );
+      updates.meal_type = targetCategory;
+      updates.category = targetCategory;
+    }
     if (updates.price !== undefined) updates.price = Number(updates.price);
     if (updates.is_active !== undefined) {
       if (typeof updates.is_active === 'string') {
@@ -986,6 +1133,16 @@ const updateMenuItem = async (req, res) => {
           `UPDATE MenuItem SET ${setClause} WHERE id = ?`,
           vals
         );
+
+        // Also ensure Product table has both category and meal_type updated
+        try {
+          if (updates.meal_type || updates.category) {
+            await connection.execute(
+              'UPDATE `Product` SET meal_type = ?, category = ? WHERE id = ?',
+              [updates.meal_type, updates.category, targetId]
+            );
+          }
+        } catch (_) {}
       }
 
       if (hasRecipe) {
@@ -1063,12 +1220,19 @@ const updateMenuItem = async (req, res) => {
 
     const [updatedRows] = await pool.execute('SELECT * FROM MenuItem WHERE id = ? LIMIT 1', [targetId]);
     const item = updatedRows[0];
+    const categoryCode = normalizeCategoryCode(item.category || item.meal_type);
+    const categoryName = formatCategoryTitle(categoryCode);
 
     // Real-time broadcast so student-app & other admin screens immediately reflect the status change
     try {
       const io = req.app.get('socketio');
       if (io) {
-        io.emit('menu:updated', { item_id: targetId, is_active: item.is_active });
+        io.emit('menu:updated', { 
+          item_id: targetId, 
+          is_active: item.is_active, 
+          meal_type: categoryCode, 
+          category: categoryCode 
+        });
         io.emit('inventory:stock_updated', { product_id: targetId });
       }
     } catch (socketErr) {
@@ -1081,6 +1245,9 @@ const updateMenuItem = async (req, res) => {
       item: {
         ...item,
         _id: item.id,
+        category: categoryCode,
+        meal_type: categoryCode,
+        category_name: categoryName,
         image_url: formatPublicImageUrl(item.image_url, req),
       },
     });
@@ -1180,6 +1347,15 @@ const deleteMenuItem = async (req, res) => {
 // Ensure MealWindow table exists and is populated with default meal types
 const ensureMealWindowTable = async () => {
   try {
+    // Auto-heal and sync existing product records where category and meal_type differ
+    try {
+      await pool.query(`
+        UPDATE \`Product\` 
+        SET category = meal_type 
+        WHERE meal_type IS NOT NULL AND meal_type != '' AND category != meal_type
+      `);
+    } catch (_) {}
+
     // In Kirana store schema, Category is the primary table and MealWindow is a compatibility VIEW
     const [catTables] = await pool.query(
       `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
