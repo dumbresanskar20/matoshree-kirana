@@ -306,9 +306,6 @@ export default function ManualOrderModal({ isOpen, onClose, onOrderCreated, prin
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-extrabold px-3 py-1 rounded-lg bg-slate-900 text-white uppercase tracking-wider">
-                  {createdOrder.meal_type}
-                </span>
                 <span className="text-[11px] font-extrabold px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 uppercase tracking-wider">
                   Paid ({createdOrder.payment_method?.toUpperCase()})
                 </span>

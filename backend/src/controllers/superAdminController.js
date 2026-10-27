@@ -336,7 +336,7 @@ const getDashboardMetrics = async (req, res) => {
       const [orders] = await pool.query(`
         SELECT 
           o.id, 
-          COALESCE(o.formatted_token, CONCAT('T-', o.token_number, '-', UPPER(LEFT(o.meal_type, 1)))) as formatted_token, 
+          COALESCE(o.formatted_token, o.token_number, CONCAT('T-', o.id)) as formatted_token, 
           o.meal_type, o.status, o.total_amount, o.payment_method, o.created_at,
           s.name as student_name, s.roll_no
         FROM \`Order\` o

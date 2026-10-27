@@ -394,7 +394,6 @@ export default function KitchenScreen({ isStaffFullscreen = false }) {
           <div class="details">
             <div><strong>Date:</strong> ${dateStr}</div>
             <div><strong>${isWalkIn ? 'Customer' : 'User'}:</strong> ${customerOrStudentName} ${rollNo ? `(${rollNo})` : ''}</div>
-            <div><strong>Meal Window:</strong> ${mealType}</div>
             <div><strong>Delivery Address:</strong> ${order.delivery_address ? `${order.delivery_address.flat_number || ''}, ${order.delivery_address.wing_name || ''} - ${order.delivery_address.society_name || ''}` : 'Counter Pickup'}</div>
             <div><strong>Payment:</strong> ${paymentMethodDisplay} (PAID)</div>
           </div>

@@ -135,10 +135,7 @@ export default function OrderHistoryModal({ isOpen, onClose }) {
                           {ord.token_number || 'Pending'}
                         </div>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-bold text-stone-800 uppercase block truncate">{ord.meal_type}</span>
-                          </div>
-                          <span className="text-[10px] text-brand-orange font-semibold block truncate">{ord.date}</span>
+                          <span className="text-xs text-stone-700 font-bold block truncate">{ord.date}</span>
                         </div>
                       </div>
 

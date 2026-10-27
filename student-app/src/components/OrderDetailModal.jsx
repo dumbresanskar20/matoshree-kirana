@@ -225,8 +225,8 @@ export default function OrderDetailModal({ order, onClose }) {
         {/* Items Summary Breakdown */}
         <div className="text-left bg-stone-50 p-3.5 sm:p-4 rounded-2xl border border-stone-200/80 space-y-2 mb-4 text-xs">
           <div className="flex justify-between font-bold text-stone-700 pb-2 border-b border-stone-200/80">
-            <span>Meal: <span className="uppercase text-brand-terracotta">{order.meal_type}</span></span>
-            <span>Date: <span className="text-stone-800">{order.date}</span></span>
+            <span>Order Date:</span>
+            <span className="text-stone-800">{order.date}</span>
           </div>
 
           {/* Delivery Address Snapshot */}

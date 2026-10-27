@@ -136,10 +136,6 @@ export default function OrderSuccessModal({ tokenNumber, order, onClose }) {
         {order && (
           <div className="text-left text-xs bg-stone-50 p-3 sm:p-3.5 rounded-2xl border border-stone-100 space-y-2 mb-4">
             <div className="flex justify-between text-stone-500">
-              <span>Meal Type:</span>
-              <span className="font-bold text-stone-800 uppercase">{order.meal_type}</span>
-            </div>
-            <div className="flex justify-between text-stone-500">
               <span>Status:</span>
               <span className={`font-extrabold uppercase px-2 py-0.5 rounded text-[10px] ${
                 currentStatus === 'delivered'

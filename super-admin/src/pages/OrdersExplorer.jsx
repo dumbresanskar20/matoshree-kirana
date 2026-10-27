@@ -164,7 +164,7 @@ export default function OrdersExplorer() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-900 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800 text-[10px]">
-                  <th className="p-4">Token & Meal</th>
+                  <th className="p-4">Order Token</th>
                   <th className="p-4">User Name & Roll No</th>
                   <th className="p-4">Amount & Payment</th>
                   <th className="p-4">Order Status</th>
@@ -187,9 +187,6 @@ export default function OrdersExplorer() {
                         <div className="flex items-center gap-2">
                           <span className="px-2.5 py-1 rounded-xl bg-indigo-600/20 text-indigo-300 font-mono font-black text-xs border border-indigo-500/30">
                             {o.formatted_token}
-                          </span>
-                          <span className="capitalize font-bold text-slate-300 text-xs">
-                            {o.meal_type}
                           </span>
                         </div>
                       </td>

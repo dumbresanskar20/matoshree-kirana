@@ -122,9 +122,6 @@ export default function TokenDetailModal({
                 <h3 className="font-extrabold text-base sm:text-lg text-stone-900 leading-tight">
                   Token Details
                 </h3>
-                <span className="text-[11px] font-bold text-stone-500 uppercase bg-stone-200 px-2 py-0.5 rounded-md">
-                  {order.meal_type}
-                </span>
               </div>
               <p className="text-[11px] text-stone-500 font-medium mt-0.5">
                 Created: {formattedTime}

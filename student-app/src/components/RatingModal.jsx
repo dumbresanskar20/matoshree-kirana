@@ -141,7 +141,7 @@ export default function RatingModal({ order, isOpen, onClose, onRatingSubmitted 
                 Rate Your Order
               </h3>
               <p className="text-[11px] text-stone-500 font-semibold truncate">
-                Token #{order.token_number} • {order.meal_type?.toUpperCase()}
+                Token #{order.token_number}
               </p>
             </div>
           </div>

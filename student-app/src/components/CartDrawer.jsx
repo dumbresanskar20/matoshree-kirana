@@ -788,25 +788,6 @@ export default function CartDrawer({ onOrderSuccess, onPaymentFailure }) {
               </div>
             </div>
 
-            {/* Meal Slot Serving Notice in Cart */}
-            <div className={`p-3 rounded-2xl flex items-start gap-2.5 text-xs shadow-2xs animate-in fade-in border ${
-              (currentMealWindow?.isAvailableNow ?? currentMealWindow?.is_currently_open)
-                ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
-                : 'bg-amber-50/90 border-amber-300 text-amber-950'
-            }`}>
-              <span className="text-base shrink-0 mt-0.5">
-                {(currentMealWindow?.isAvailableNow ?? currentMealWindow?.is_currently_open) ? '🟢' : '⏰'}
-              </span>
-              <div className="space-y-0.5">
-                <p className="font-extrabold">
-                  Store Operating Status
-                </p>
-                <p className="text-[11px] font-semibold leading-relaxed">
-                  {currentMealWindow?.serving_note || ((currentMealWindow?.isAvailableNow ?? currentMealWindow?.is_currently_open) ? 'Store is open for orders.' : 'Store ordering is currently closed.')}
-                </p>
-              </div>
-            </div>
-
             {/* Delivery Address Section (Directly ABOVE Pay button) */}
             <div className="space-y-2 pt-2 border-t border-stone-100">
               <div className="flex items-center justify-between">
